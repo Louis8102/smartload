@@ -11,7 +11,8 @@ d Distribution-Date: 20260709
 d License: MIT
 d Requires: Stata 19.5; SSC package filelist
 d Install dependency first: ssc install filelist
-d Then install smartload with: net install smartload, from("https://raw.githubusercontent.com/USERNAME/smartload/main") replace
+d Then install smartload with: net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
+d Everything ES (es.exe) is optional only; smartload does not require it
 d
 f smartload.ado
 f smartload.sthlp

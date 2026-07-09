@@ -54,9 +54,8 @@ file close fh
 di as txt "1. ado loads"
 which smartload
 
-di as txt "2. no explicit search defaults to all drives and requires force"
-cap noi smartload sample.csv
-assert _rc != 0
+di as txt "2. default no-location search no longer requires force"
+di as txt "   skipped here to avoid a whole-drive scan during the self-test"
 
 di as txt "3. no match is reported"
 cap noi smartload does_not_exist.csv, search("`base'\empty")
@@ -107,23 +106,30 @@ di as txt "12. multiple semicolon roots accepted"
 smartload sample.dta, search("`base'\empty;`base'\root1") clear
 assert r(N) == 5
 
-di as txt "13. drives(all) requires force"
-cap noi smartload sample.dta, drives(all) clear
-assert _rc != 0
+di as txt "13. noeverything option is accepted"
+smartload sample.dta, search("`base'\root1") noeverything clear
+assert r(N) == 5
 
-di as txt "14. selected unavailable drive letters are skipped"
+di as txt "14. bare clear without comma is accepted in current-directory fast search"
+local oldpwd "`c(pwd)'"
+cd "`base'\root1"
+smartload sample.dta clear
+assert r(N) == 5
+cd "`oldpwd'"
+
+di as txt "15. selected unavailable drive letters are skipped"
 cap noi smartload definitely_absent_smartload_file.dta, drives(Z) clear
 assert _rc != 0
 
-di as txt "15. PDF is detected without pretending direct import"
+di as txt "16. PDF is detected without pretending direct import"
 smartload report.pdf, search("`base'\root1") clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as txt "16. DOCX is detected"
+di as txt "17. DOCX is detected"
 smartload report.docx, search("`base'\root1") clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as txt "17. PPTX is detected"
+di as txt "18. PPTX is detected"
 smartload slides.pptx, search("`base'\root1") clear
 assert "`r(status)'" == "detected_not_imported"
 

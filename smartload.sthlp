@@ -31,8 +31,8 @@
 {cmd:cloud(}{it:providers}{cmd:)}
 {cmd:cloudroot(}{it:roots}{cmd:)}
 {cmd:force}
-{cmd:exhaustive}
 {cmd:nonetwork}
+{cmd:noeverything}
 {cmd:ocr}
 {cmd:log}
 {cmd:replace}]
@@ -48,6 +48,10 @@ Install the dependency before using {cmd:smartload}:
 
 {phang2}{cmd:. ssc install filelist}{p_end}
 
+{pstd}
+Everything ES ({cmd:es.exe}) is optional only.  Users do not need to install
+Everything to use {cmd:smartload}.
+
 {title:Installation}
 
 {pstd}
@@ -55,12 +59,12 @@ V0.1 is SSC-style but is not an official SSC-hosted package unless accepted by
 SSC.  Install from the GitHub raw URL:
 
 {phang2}{cmd:. ssc install filelist}{p_end}
-{phang2}{cmd:. net install smartload, from("https://raw.githubusercontent.com/USERNAME/smartload/main") replace}{p_end}
+{phang2}{cmd:. net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace}{p_end}
 {phang2}{cmd:. help smartload}{p_end}
 
 {pstd}
-Replace {cmd:USERNAME} with the GitHub account or organization name.  If the
-default branch is {cmd:master}, replace {cmd:main} with {cmd:master}.
+This assumes the GitHub repository is {cmd:Louis8102/smartload} and the default
+branch is {cmd:main}.
 
 {title:Description}
 
@@ -68,8 +72,9 @@ default branch is {cmd:master}, replace {cmd:main} with {cmd:master}.
 {cmd:smartload} is an SSC-style universal data finder and cautious data loader.
 The user supplies a file name.  If no {cmd:search()}, {cmd:drives()},
 {cmd:cloudroot()}, or {cmd:cloud()} option is specified, {cmd:smartload}
-defaults to searching all available drive letters from C through Z, but requires
-{cmd:force} before starting that broad recursive search.  If exactly one matching file is found, the command
+defaults to searching all available drive letters from C through Z.  On Windows,
+whole-drive search first tries voidtools Everything ES ({cmd:es.exe}) when it is
+already available and Everything is running.  Everything is not required.  If exactly one matching file is found, the command
 detects the extension and imports only formats that Stata can load reliably in
 the current version.
 
@@ -114,17 +119,16 @@ under {cmd:C:\Users\}{it:username}: Dropbox, OneDrive, Google Drive, My Drive,
 and Box.  Missing folders are skipped.
 
 {phang}
-{cmd:force} is required for {cmd:drives(all)} and for the default no-location
-mode, which is equivalent to {cmd:drives(all)}.
-
-{phang}
-{cmd:exhaustive} disables filtering of obvious system-folder matches.  Version
-0.1 still relies on {cmd:filelist} for traversal; the filter prevents matching
-system paths but does not optimize traversal.
+{cmd:force} is accepted for backward compatibility, but is not required for
+whole-drive search.
 
 {phang}
 {cmd:nonetwork} attempts to skip mapped network drives when drive detection is
 possible.
+
+{phang}
+{cmd:noeverything} skips Everything ES acceleration.  The command can still use
+the Windows Search index and fast common data roots.
 
 {phang}
 {cmd:ocr} is a reserved explicit request for future OCR workflows. OCR is not
@@ -147,10 +151,16 @@ locations, it lists them and stops.
 {pstd}
 {cmd:drives(C D E F)} checks whether each requested drive root exists before
 searching it.  Unavailable drives are skipped without error.  {cmd:drives(all)}
-checks drive letters C through Z and requires {cmd:force}, because whole-drive
-searches may be slow.  If neither {cmd:search()} nor {cmd:drives()} nor cloud
-options are specified, {cmd:smartload} defaults to {cmd:drives(all)} and also
-requires {cmd:force}.  {cmd:exhaustive} disables default system-path filtering.
+checks drive letters C through Z.  If neither {cmd:search()} nor {cmd:drives()}
+nor cloud options are specified, {cmd:smartload} defaults to {cmd:drives(all)}.
+On Windows, {cmd:smartload} first tries voidtools Everything ES ({cmd:es.exe})
+for this broad search only if it is already available.  Users do not need to
+install Everything.  If ES is unavailable or Everything is not running,
+{cmd:smartload} searches common user data roots first: current directory,
+Desktop, Documents, Downloads, OneDrive, Dropbox, Google Drive/My Drive, and
+Box.  Only if those fast roots do not find the file does {cmd:smartload} fall
+back without doing slow drive-wide recursion.  {cmd:noeverything} skips the
+Everything check.
 {cmd:nonetwork} requests mapped-network-drive skipping when detection succeeds.
 
 {title:Cloud-synced folder search}
@@ -269,21 +279,22 @@ For detected but not imported files, it returns {cmd:r(filepath)},
 
 {title:Examples}
 
-{phang2}{cmd:. smartload mydata.xlsx, force firstrow clear}{p_end}
-{phang2}{cmd:. smartload mydata.xlsx, search("C:\Users\YOURNAME\Documents") firstrow clear}{p_end}
-{phang2}{cmd:. smartload school_data.dta, search("C:\ANOVA") clear}{p_end}
-{phang2}{cmd:. smartload survey.sav, search("C:\Users\YOURNAME\Downloads") clear}{p_end}
-{phang2}{cmd:. smartload mydata.csv, search("D:\Research") clear}{p_end}
-{phang2}{cmd:. smartload mydata.xlsx, search("D:\Research;E:\Data;F:\Backup") clear}{p_end}
-{phang2}{cmd:. smartload mydata.xlsx, drives(C D E F) clear}{p_end}
-{phang2}{cmd:. smartload mydata.xlsx, drives(all) force clear}{p_end}
-{phang2}{cmd:. smartload report.pdf, search("D:\Research") pdftable(1) clear}{p_end}
+{phang2}{cmd:. smartload Indicator.dta, clear}{p_end}
+{phang2}{cmd:. smartload city.sas7bdat, clear}{p_end}
+{phang2}{cmd:. smartload survey.sav, clear}{p_end}
+{phang2}{cmd:. smartload mydata.xlsx, firstrow clear}{p_end}
+{phang2}{cmd:. smartload mydata.csv, clear}{p_end}
+{phang2}{cmd:. smartload Indicator.dta clear}{p_end}
+{phang2}{cmd:. smartload workbook.xlsx, sheet("Sheet1") firstrow clear}{p_end}
+{phang2}{cmd:. smartload mydata.xlsx, drives(all) clear}{p_end}
+{phang2}{cmd:. smartload Indicator.dta, search("D:\Research") clear}{p_end}
 
-{title:Performance warnings}
+{title:Performance behavior}
 
 {pstd}
-Whole-drive recursive search can be slow, especially on mapped network drives
-and large external drives.  Prefer specific {cmd:search()} roots when possible.
+Default no-location search and {cmd:drives(all)} are designed to be fast.  They
+use available filename indexes and common user data roots instead of crawling
+every folder on every drive.
 
 {title:Safety limitations}
 

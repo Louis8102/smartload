@@ -4,9 +4,25 @@ program define smartload, rclass
         OBJECT(string) LAYER(string) MEMBER(string) SLIDE(integer -1) ///
         TABLEINDEX(integer -1) DOCTABLE(integer -1) PDFTABLE(integer -1) ///
         PPTTABLE(integer -1) CLOUD(string) CLOUDROOT(string) FORCE ///
-        EXHAUSTIVE NONETWORK OCR LOG REPLACE]
+        NONETWORK NOEVERYTHING OCR LOG REPLACE]
 
     loc filename `"`fname'"'
+    local ntokens : word count `filename'
+    while `ntokens' > 1 {
+        local last : word `ntokens' of `filename'
+        local last_l = lower("`last'")
+        if "`last_l'" == "clear" local clear "clear"
+        else if "`last_l'" == "force" local force "force"
+        else if "`last_l'" == "firstrow" local firstrow "firstrow"
+        else if "`last_l'" == "nonetwork" local nonetwork "nonetwork"
+        else if "`last_l'" == "noeverything" local noeverything "noeverything"
+        else if "`last_l'" == "ocr" local ocr "ocr"
+        else if "`last_l'" == "log" local log "log"
+        else if "`last_l'" == "replace" local replace "replace"
+        else continue, break
+        local filename : list filename - last
+        local ntokens : word count `filename'
+    }
     local filename = subinstr(`"`filename'"', char(34), "", .)
     mata: st_local("filename", pathbasename(st_local("filename")))
     if `"`filename'"' == "" {
@@ -16,13 +32,6 @@ program define smartload, rclass
 
     if `"`search'"' == "" & `"`drives'"' == "" & `"`cloudroot'"' == "" & `"`cloud'"' == "" {
         loc drives "all"
-        if "`force'" == "" {
-            di as err "No search location was specified, so smartload will default to all available drives."
-            di as err "This may take a long time."
-            di as txt "To continue, rerun the command with option force."
-            di as txt `"Example: smartload `filename', force clear"'
-            exit 498
-        }
     }
 
     cap which filelist
@@ -30,14 +39,6 @@ program define smartload, rclass
         di as err "The command filelist is required. Please install it first:"
         di as txt "ssc install filelist"
         exit 499
-    }
-
-    if lower(strtrim(`"`drives'"')) == "all" & "`force'" == "" {
-        di as err "You requested a search across all available drives."
-        di as err "This may take a long time."
-        di as txt "To continue, rerun the command with option force."
-        di as txt `"Example: smartload `filename', force clear"'
-        exit 498
     }
 
     loc cmdline `"smartload `filename'"'
@@ -55,6 +56,12 @@ program define smartload, rclass
     tempname posth
     postfile `posth' str2045 filepath str2045 root str20 storage using "`found'", replace
 
+    mata: st_local("pwdhit", pathjoin(c("pwd"), st_local("filename")))
+    cap confirm file `"`pwdhit'"'
+    if !_rc {
+        post `posth' (`"`pwdhit'"') (`"`c(pwd)'"') ("local")
+    }
+
     if `logrequested' file write `lh' "Explicit search roots:" _n
     if `"`search'"' != "" {
         global SMARTLOAD_ROOTS "`search'"
@@ -64,7 +71,20 @@ program define smartload, rclass
     loc drives_l = lower(strtrim(`"`drives'"'))
     if `"`drives_l'"' != "" {
         if `logrequested' file write `lh' "Drives requested: `drives'" _n
+        loc skip_filelist_drives 0
         if "`drives_l'" == "all" {
+            if "`noeverything'" == "" {
+                smartload__searcheverything, filename("`filename'") post(`posth') loghandle(`lh') log(`logrequested')
+                if r(nposted) > 0 loc skip_filelist_drives 1
+            }
+            if !`skip_filelist_drives' {
+                smartload__searchwindowsindex, filename("`filename'") post(`posth') loghandle(`lh') log(`logrequested')
+                if r(nposted) > 0 loc skip_filelist_drives 1
+            }
+            if !`skip_filelist_drives' {
+                smartload__searchquickroots, filename("`filename'") post(`posth') loghandle(`lh') log(`logrequested')
+                loc skip_filelist_drives 1
+            }
             loc drvlist ""
             forvalues i = 67/90 {
                 loc d = char(`i')
@@ -73,25 +93,27 @@ program define smartload, rclass
         }
         else loc drvlist `"`drives'"'
 
-        foreach d of local drvlist {
-            loc d = upper(strtrim("`d'"))
-            local d : subinstr local d ":" "", all
-            if length("`d'") != 1 continue
-            loc root "`d':\"
-            mata: st_local("direx", strofreal(direxists(st_local("root"))))
-            if "`direx'" != "1" {
-                if `logrequested' file write `lh' "Unavailable drive skipped: `root'" _n
-                continue
-            }
-            if "`nonetwork'" != "" {
-                cap noi shell net use `d':
-                if !_rc {
-                    if `logrequested' file write `lh' "Drive skipped by nonetwork: `root'" _n
+        if !`skip_filelist_drives' {
+            foreach d of local drvlist {
+                loc d = upper(strtrim("`d'"))
+                local d : subinstr local d ":" "", all
+                if length("`d'") != 1 continue
+                loc root "`d':\"
+                mata: st_local("direx", strofreal(direxists(st_local("root"))))
+                if "`direx'" != "1" {
+                    if `logrequested' file write `lh' "Unavailable drive skipped: `root'" _n
                     continue
                 }
+                if "`nonetwork'" != "" {
+                    cap noi shell net use `d':
+                    if !_rc {
+                        if `logrequested' file write `lh' "Drive skipped by nonetwork: `root'" _n
+                        continue
+                    }
+                }
+                global SMARTLOAD_ROOT "`root'"
+                smartload__searchone, filename("`filename'") post(`posth') storage(local) loghandle(`lh') log(`logrequested')
             }
-            global SMARTLOAD_ROOT "`root'"
-            smartload__searchone, filename("`filename'") post(`posth') storage(local) loghandle(`lh') log(`logrequested')
         }
     }
 
@@ -103,8 +125,8 @@ program define smartload, rclass
 
     if `"`cloud'"' != "" {
         loc providers = lower(`"`cloud'"')
-        loc home "C:\Users\`c(username)'"
-        loc cands `"`home'\Dropbox;`home'\OneDrive;`home'\Google Drive;`home'\My Drive;`home'\Box"'
+        loc home "C:/Users/`c(username)'"
+        loc cands `"`home'/Dropbox;`home'/OneDrive;`home'/Google Drive;`home'/My Drive;`home'/Box"'
         global SMARTLOAD_ROOTS "`cands'"
         smartload__searchroots, filename("`filename'") post(`posth') storage(cloud_synced) loghandle(`lh') log(`logrequested')
     }
@@ -128,7 +150,7 @@ program define smartload, rclass
     }
     qui duplicates drop filepath, force
     qui count
-    if r(N) > 0 & "`exhaustive'" == "" {
+    if r(N) > 0 {
         gen str2045 __smartload_path_l = lower(filepath)
         qui drop if strpos(__smartload_path_l, "\windows\") | ///
             strpos(__smartload_path_l, "\program files\") | ///
@@ -136,8 +158,7 @@ program define smartload, rclass
             strpos(__smartload_path_l, "\programdata\") | ///
             strpos(__smartload_path_l, "\$recycle.bin\") | ///
             strpos(__smartload_path_l, "\system volume information\") | ///
-            strpos(__smartload_path_l, "\recovery\") | ///
-            strpos(__smartload_path_l, "\appdata\local\temp\")
+            strpos(__smartload_path_l, "\recovery\")
         drop __smartload_path_l
     }
     qui count
@@ -290,11 +311,181 @@ program define smartload, rclass
     }
 end
 
-program define smartload__searchroots
+program define smartload__searchwindowsindex, rclass
+    syntax , FILENAME(string) POST(string) LOGHANDLE(string) LOG(integer)
+    loc posth "`post'"
+    loc lh "`loghandle'"
+    loc logrequested "`log'"
+
+    if "`c(os)'" != "Windows" {
+        return scalar used = 0
+        return scalar nposted = 0
+        exit
+    }
+
+    tempfile ps1 winout
+    tempname ph
+    file open `ph' using "`ps1'", write text replace
+    file write `ph' "param([string]" "$" "Name, [string]" "$" "Out)" _n
+    file write `ph' "$" "ErrorActionPreference = 'Stop'" _n
+    file write `ph' "New-Item -ItemType File -Path " "$" "Out -Force | Out-Null" _n
+    file write `ph' "$" "q = [char]39" _n
+    file write `ph' "$" "escaped = " "$" "Name.Replace(" "$" "q, " "$" "q + " "$" "q)" _n
+    file write `ph' "$" "prefix = 'SELECT System.ItemPathDisplay FROM SystemIndex WHERE System.FileName = '" _n
+    file write `ph' "$" "sql = " "$" "prefix + " "$" "q + " "$" "escaped + " "$" "q" _n
+    file write `ph' "$" "conn = New-Object -ComObject ADODB.Connection" _n
+    file write `ph' "$" `"conn.Open('Provider=Search.CollatorDSO;Extended Properties="Application=Windows";')"' _n
+    file write `ph' "$" "rs = " "$" "conn.Execute(" "$" "sql)" _n
+    file write `ph' "while (-not " "$" "rs.EOF) {" _n
+    file write `ph' "    " "$" "p = [string]" "$" "rs.Fields.Item('System.ItemPathDisplay').Value" _n
+    file write `ph' "    if (" "$" "p) { Add-Content -LiteralPath " "$" "Out -Value " "$" "p -Encoding UTF8 }" _n
+    file write `ph' "    " "$" "rs.MoveNext()" _n
+    file write `ph' "}" _n
+    file close `ph'
+
+    if "`logrequested'" == "1" file write `lh' "Windows Search index query attempted." _n
+    cap shell powershell.exe -NoProfile -ExecutionPolicy Bypass -File "`ps1'" -Name "`filename'" -Out "`winout'"
+    if _rc {
+        if "`logrequested'" == "1" file write `lh' "Windows Search index query failed; trying fast roots." _n
+        return scalar used = 0
+        return scalar nposted = 0
+        exit
+    }
+
+    cap confirm file "`winout'"
+    if _rc {
+        return scalar used = 1
+        return scalar nposted = 0
+        exit
+    }
+
+    tempname wh
+    cap file open `wh' using "`winout'", read text
+    if _rc {
+        return scalar used = 1
+        return scalar nposted = 0
+        exit
+    }
+    loc nposted 0
+    file read `wh' line
+    while r(eof) == 0 {
+        loc line = strtrim(`"`line'"')
+        if `"`line'"' != "" {
+            mata: st_local("base", pathbasename(st_local("line")))
+            if `"`base'"' == `"`filename'"' {
+                post `posth' (`"`line'"') ("Windows Search") ("indexed")
+                loc ++nposted
+            }
+        }
+        file read `wh' line
+    }
+    file close `wh'
+    return scalar used = 1
+    return scalar nposted = `nposted'
+end
+
+program define smartload__searchquickroots, rclass
+    syntax , FILENAME(string) POST(string) LOGHANDLE(string) LOG(integer)
+    loc home "C:/Users/`c(username)'"
+    loc roots `"`c(pwd)';`home'/Desktop;`home'/Documents;`home'/Downloads;`home'/OneDrive;`home'/OneDrive/Documents;`home'/Dropbox;`home'/Google Drive;`home'/My Drive;`home'/Box"'
+    if "`log'" == "1" file write `loghandle' "Fast common data roots searched before whole-drive fallback:" _n
+    global SMARTLOAD_ROOTS "`roots'"
+    smartload__searchroots, filename("`filename'") post(`post') storage(local) loghandle(`loghandle') log(`log')
+    return scalar nposted = r(nposted)
+end
+
+program define smartload__searcheverything, rclass
+    syntax , FILENAME(string) POST(string) LOGHANDLE(string) LOG(integer)
+    loc posth "`post'"
+    loc lh "`loghandle'"
+    loc logrequested "`log'"
+    loc espath ""
+
+    tempfile whereout esout
+    cap shell where es.exe > "`whereout'"
+    cap confirm file "`whereout'"
+    if !_rc {
+        tempname wh
+        cap file open `wh' using "`whereout'", read text
+        if !_rc {
+            file read `wh' line
+            if r(eof) == 0 loc espath = strtrim(`"`line'"')
+            file close `wh'
+        }
+    }
+
+    if `"`espath'"' == "" {
+        foreach cand in ///
+            `"C:/Program Files/Everything/es.exe"' ///
+            `"C:/Program Files (x86)/Everything/es.exe"' ///
+            `"C:/Users/`c(username)'/AppData/Local/Everything/es.exe"' {
+            cap confirm file `"`cand'"'
+            if !_rc {
+                loc espath `"`cand'"'
+                continue, break
+            }
+        }
+    }
+
+    if `"`espath'"' == "" {
+        if "`logrequested'" == "1" file write `lh' "Everything ES not found; falling back to filelist." _n
+        return scalar used = 0
+        return scalar nposted = 0
+        exit
+    }
+
+    loc searchtext `"file:exact:`filename'"'
+    if "`logrequested'" == "1" {
+        file write `lh' "Everything ES path: `espath'" _n
+        file write `lh' "Everything ES query: `searchtext'" _n
+    }
+
+    cap shell `"`espath'" -name -full-path-and-name -n 5000 -export-txt "`esout'" "`searchtext'""'
+    if _rc {
+        if "`logrequested'" == "1" file write `lh' "Everything ES failed; falling back to filelist." _n
+        return scalar used = 0
+        return scalar nposted = 0
+        exit
+    }
+
+    cap confirm file "`esout'"
+    if _rc {
+        return scalar used = 1
+        return scalar nposted = 0
+        exit
+    }
+
+    tempname eh
+    cap file open `eh' using "`esout'", read text
+    if _rc {
+        return scalar used = 1
+        return scalar nposted = 0
+        exit
+    }
+    loc nposted 0
+    file read `eh' line
+    while r(eof) == 0 {
+        loc line = strtrim(`"`line'"')
+        if `"`line'"' != "" {
+            mata: st_local("base", pathbasename(st_local("line")))
+            if `"`base'"' == `"`filename'"' {
+                post `posth' (`"`line'"') ("Everything") ("everything")
+                loc ++nposted
+            }
+        }
+        file read `eh' line
+    }
+    file close `eh'
+    return scalar used = 1
+    return scalar nposted = `nposted'
+end
+
+program define smartload__searchroots, rclass
     syntax , FILENAME(string) POST(string) STORAGE(string) LOGHANDLE(string) LOG(integer)
     local filename = subinstr(`"`filename'"', char(34), "", .)
     loc rest "$SMARTLOAD_ROOTS"
     local rest = subinstr(`"`rest'"', char(34), "", .)
+    loc total 0
     while `"`rest'"' != "" {
         loc semi = strpos(`"`rest'"', ";")
         if `semi' > 0 {
@@ -310,10 +501,12 @@ program define smartload__searchroots
         if `"`root'"' == "" continue
         global SMARTLOAD_ROOT "`root'"
         smartload__searchone, filename("`filename'") post(`post') storage(`storage') loghandle(`loghandle') log(`log')
+        loc total = `total' + r(nposted)
     }
+    return scalar nposted = `total'
 end
 
-program define smartload__searchone
+program define smartload__searchone, rclass
     syntax , FILENAME(string) POST(string) STORAGE(string) LOGHANDLE(string) LOG(integer)
     loc root "$SMARTLOAD_ROOT"
     loc posth "`post'"
@@ -324,25 +517,37 @@ program define smartload__searchone
     mata: st_local("direx", strofreal(direxists(st_local("root"))))
     if "`direx'" != "1" {
         if "`logrequested'" == "1" file write `lh' "Skipped missing root: `root'" _n
+        return scalar nposted = 0
         exit
     }
     if "`logrequested'" == "1" file write `lh' "  `root'" _n
+    mata: st_local("direct", pathjoin(st_local("root"), st_local("filename")))
+    cap confirm file `"`direct'"'
+    if !_rc {
+        post `posth' (`"`direct'"') (`"`root'"') ("`storage'")
+        return scalar nposted = 1
+        exit
+    }
     tempfile fl
-    cap qui filelist, directory(`"`root'"') pattern(`"`filename'"') save(`"`fl'"') replace
+    loc froot = subinstr(`"`root'"', char(92), "/", .)
+    cap qui filelist, directory(`"`froot'"') pattern(`"`filename'"') save(`"`fl'"') replace
     if _rc {
         di as err `"Could not search `root' with filelist. Root skipped."'
         if "`logrequested'" == "1" file write `lh' "Search failed: `root'" _n
+        return scalar nposted = 0
         exit
     }
     preserve
     cap qui use "`fl'", clear
     if _rc {
         restore
+        return scalar nposted = 0
         exit
     }
     cap confirm var filename
     if _rc {
         restore
+        return scalar nposted = 0
         exit
     }
     qui keep if filename == `"`filename'"'
@@ -353,15 +558,18 @@ program define smartload__searchone
     qui count
     if r(N) == 0 {
         restore
+        return scalar nposted = 0
         exit
     }
-    forvalues i = 1/`r(N)' {
+    loc nposted = r(N)
+    forvalues i = 1/`nposted' {
         loc d = dirname[`i']
         loc f = filename[`i']
         mata: st_local("full", pathjoin(st_local("d"), st_local("f")))
         post `posth' (`"`full'"') (`"`root'"') ("`storage'")
     }
     restore
+    return scalar nposted = `nposted'
 end
 
 program define smartload__detected, rclass
