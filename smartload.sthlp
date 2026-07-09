@@ -37,6 +37,31 @@
 {cmd:log}
 {cmd:replace}]
 
+{title:Requirements}
+
+{pstd}
+{cmd:smartload} V0.1 requires the SSC package {cmd:filelist}.  The command uses
+{cmd:filelist} for recursive exact-name file searches.
+
+{pstd}
+Install the dependency before using {cmd:smartload}:
+
+{phang2}{cmd:. ssc install filelist}{p_end}
+
+{title:Installation}
+
+{pstd}
+V0.1 is SSC-style but is not an official SSC-hosted package unless accepted by
+SSC.  Install from the GitHub raw URL:
+
+{phang2}{cmd:. ssc install filelist}{p_end}
+{phang2}{cmd:. net install smartload, from("https://raw.githubusercontent.com/USERNAME/smartload/main") replace}{p_end}
+{phang2}{cmd:. help smartload}{p_end}
+
+{pstd}
+Replace {cmd:USERNAME} with the GitHub account or organization name.  If the
+default branch is {cmd:master}, replace {cmd:main} with {cmd:master}.
+
 {title:Description}
 
 {pstd}
@@ -245,9 +270,9 @@ For detected but not imported files, it returns {cmd:r(filepath)},
 {title:Examples}
 
 {phang2}{cmd:. smartload mydata.xlsx, force firstrow clear}{p_end}
-{phang2}{cmd:. smartload mydata.xlsx, search("C:\Users\mhwxl\Documents") firstrow clear}{p_end}
+{phang2}{cmd:. smartload mydata.xlsx, search("C:\Users\YOURNAME\Documents") firstrow clear}{p_end}
 {phang2}{cmd:. smartload school_data.dta, search("C:\ANOVA") clear}{p_end}
-{phang2}{cmd:. smartload survey.sav, search("C:\Users\mhwxl\Downloads") clear}{p_end}
+{phang2}{cmd:. smartload survey.sav, search("C:\Users\YOURNAME\Downloads") clear}{p_end}
 {phang2}{cmd:. smartload mydata.csv, search("D:\Research") clear}{p_end}
 {phang2}{cmd:. smartload mydata.xlsx, search("D:\Research;E:\Data;F:\Backup") clear}{p_end}
 {phang2}{cmd:. smartload mydata.xlsx, drives(C D E F) clear}{p_end}
@@ -272,7 +297,7 @@ adult media.  It does not use OCR by default.
 {pstd}
 MIT License.  See {cmd:LICENSE} in the distribution files.
 
-{title:Author placeholder}
+{title:Author}
 
 {pstd}
-Author: to be supplied.
+Hao Ma.

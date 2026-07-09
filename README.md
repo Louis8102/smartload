@@ -2,6 +2,53 @@
 
 `smartload` is an SSC-style Stata command for finding an exact file name under requested locations and importing it only when the current implementation can do so reliably.
 
+## Installation
+
+Important: V0.1 is **SSC-style**, but it is not yet an official SSC-hosted package unless and until it is submitted to and accepted by SSC. Do not tell users to run `ssc install smartload` until that happens.
+
+### Install from GitHub
+
+After uploading these files to the root of a GitHub repository named `smartload`, with `example_data/` as a subfolder, users can install from the raw GitHub URL:
+
+```stata
+ssc install filelist
+net install smartload, from("https://raw.githubusercontent.com/USERNAME/smartload/main") replace
+help smartload
+```
+
+Replace `USERNAME` with the GitHub account or organization name. If the default branch is `master` instead of `main`, replace `main` with `master`.
+
+The `filelist` package is required because V0.1 uses it for recursive file search.
+
+Recommended GitHub repository layout:
+
+```text
+smartload/
+  README.md
+  LICENSE
+  smartload.ado
+  smartload.sthlp
+  smartload.pkg
+  stata.toc
+  test_smartload.do
+  example_data/
+    smartload_example.dta
+    smartload_example.csv
+    smartload_example.xlsx
+    smartload_example.dat
+    smartload_example.sav
+    smartload_example.sas7bdat
+    smartload_example_manifest.dta
+```
+
+### If accepted by SSC in the future
+
+Only after the package is officially hosted on SSC should users install with:
+
+```stata
+ssc install smartload
+```
+
 ## Version record
 
 - Module: `smartload`
@@ -10,6 +57,7 @@
 - Tested with: StataNow/MP 19.5 on Windows
 - Required dependency: SSC `filelist`
 - License: MIT
+- Author: Hao Ma
 - Distribution files: `smartload.ado`, `smartload.sthlp`, `smartload.pkg`, `stata.toc`, `test_smartload.do`, `LICENSE`, `example_data/`, and this README
 - Version status: working baseline for native Stata-readable data files; conversion-heavy formats are detected but not imported
 
@@ -81,7 +129,7 @@ smartload survey.csv, search("D:\Research") encoding("UTF-8") clear
 Cloud-synced local folders:
 
 ```stata
-smartload mydata.xlsx, cloudroot("D:\Dropbox;C:\Users\mhwxl\OneDrive") firstrow clear
+smartload mydata.xlsx, cloudroot("D:\Dropbox;C:\Users\YOURNAME\OneDrive") firstrow clear
 smartload mydata.xlsx, search("D:\Research") cloud(dropbox onedrive gdrive box) firstrow clear
 ```
 
@@ -193,7 +241,6 @@ PDF, Word, and PowerPoint files are not rectangular Stata datasets. V0.1 detects
 Run `test_smartload.do` from the same folder as `smartload.ado` and `smartload.sthlp` in Stata MP 19.5:
 
 ```stata
-cd "C:\Users\mhwxl\Documents\Codex\2026-07-09\new-chat\outputs"
 do test_smartload.do
 ```
 

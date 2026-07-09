@@ -6,9 +6,12 @@ d and local cloud-synced folders for an exact file name.  It imports only
 d formats supported reliably in the current version and reports conversion-
 d based formats without pretending they were loaded.
 d
-d Author: placeholder
+d Author: Hao Ma
 d Distribution-Date: 20260709
+d License: MIT
 d Requires: Stata 19.5; SSC package filelist
+d Install dependency first: ssc install filelist
+d Then install smartload with: net install smartload, from("https://raw.githubusercontent.com/USERNAME/smartload/main") replace
 d
 f smartload.ado
 f smartload.sthlp
