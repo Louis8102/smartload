@@ -1,0 +1,3 @@
+v 3
+d smartload package directory
+p smartload Universal data finder and cautious Stata data loader

@@ -1,0 +1,24 @@
+v 3
+d smartload: universal data finder and cautious Stata data loader
+d
+d smartload searches requested local roots, drives, removable/external drives,
+d and local cloud-synced folders for an exact file name.  It imports only
+d formats supported reliably in the current version and reports conversion-
+d based formats without pretending they were loaded.
+d
+d Author: placeholder
+d Distribution-Date: 20260709
+d Requires: Stata 19.5; SSC package filelist
+d
+f smartload.ado
+f smartload.sthlp
+f test_smartload.do
+f README.md
+f LICENSE
+f example_data/smartload_example.dta
+f example_data/smartload_example.csv
+f example_data/smartload_example.xlsx
+f example_data/smartload_example.dat
+f example_data/smartload_example.sav
+f example_data/smartload_example.sas7bdat
+f example_data/smartload_example_manifest.dta
