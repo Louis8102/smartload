@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.1.0 09jul2026}{...}
+{* *! version 0.1.1 09jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -40,7 +40,7 @@
 {title:Requirements}
 
 {pstd}
-{cmd:smartload} V0.1 requires the SSC package {cmd:filelist}.  The command uses
+{cmd:smartload} V0.1.1 requires the SSC package {cmd:filelist}.  The command uses
 {cmd:filelist} for recursive exact-name file searches.
 
 {pstd}
@@ -284,7 +284,6 @@ For detected but not imported files, it returns {cmd:r(filepath)},
 {phang2}{cmd:. smartload survey.sav, clear}{p_end}
 {phang2}{cmd:. smartload mydata.xlsx, firstrow clear}{p_end}
 {phang2}{cmd:. smartload mydata.csv, clear}{p_end}
-{phang2}{cmd:. smartload Indicator.dta clear}{p_end}
 {phang2}{cmd:. smartload workbook.xlsx, sheet("Sheet1") firstrow clear}{p_end}
 {phang2}{cmd:. smartload mydata.xlsx, drives(all) clear}{p_end}
 {phang2}{cmd:. smartload Indicator.dta, search("D:\Research") clear}{p_end}

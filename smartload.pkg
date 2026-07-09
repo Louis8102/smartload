@@ -1,5 +1,6 @@
 v 3
 d smartload: universal data finder and cautious Stata data loader
+d Version: 0.1.1
 d
 d smartload searches requested local roots, drives, removable/external drives,
 d and local cloud-synced folders for an exact file name.  It imports only

@@ -1,4 +1,6 @@
+*! smartload 0.1.1 09jul2026 Hao Ma
 program define smartload, rclass
+    version 19.5
     syntax anything(name=fname id="file name") [, SEARCH(string) DRIVES(string) ///
         CLEAR SHEET(string) FIRSTROW ENCODING(string) TABLE(string) ///
         OBJECT(string) LAYER(string) MEMBER(string) SLIDE(integer -1) ///
@@ -79,6 +81,10 @@ program define smartload, rclass
             }
             if !`skip_filelist_drives' {
                 smartload__searchwindowsindex, filename("`filename'") post(`posth') loghandle(`lh') log(`logrequested')
+                if r(nposted) > 0 loc skip_filelist_drives 1
+            }
+            if !`skip_filelist_drives' {
+                smartload__searchdriveroots, filename("`filename'") post(`posth') loghandle(`lh') log(`logrequested')
                 if r(nposted) > 0 loc skip_filelist_drives 1
             }
             if !`skip_filelist_drives' {
@@ -179,13 +185,32 @@ program define smartload, rclass
             loc p = filepath[`i']
             di as txt "`i'. `p'"
         }
-        di as err "File name is not unique. Please rerun smartload with a more specific search(), drives(), cloudroot(), member(), sheet(), table(), object(), layer(), slide(), or tableindex() option."
-        if `logrequested' {
-            file write `lh' "Result: failure - multiple matches" _n _n
-            file close `lh'
+        if c(mode) == "batch" {
+            di as err "File name is not unique. Batch mode cannot prompt for a choice."
+            di as txt "Run interactively and choose a number, or narrow the search."
+            if `logrequested' {
+                file write `lh' "Result: failure - multiple matches in batch mode" _n _n
+                file close `lh'
+            }
+            restore
+            exit 459
         }
-        restore
-        exit 459
+        di as txt "Type the number of the file to import, then press Enter."
+        cap macro drop SMARTLOAD_CHOICE
+        display _request(SMARTLOAD_CHOICE)
+        loc choice = strtrim("$SMARTLOAD_CHOICE")
+        cap confirm integer number `choice'
+        if _rc | real("`choice'") < 1 | real("`choice'") > `nmatch' {
+            di as err "Invalid selection. No file was imported."
+            if `logrequested' {
+                file write `lh' "Result: failure - invalid multiple-match selection" _n _n
+                file close `lh'
+            }
+            restore
+            exit 198
+        }
+        qui keep in `choice'
+        loc nmatch = 1
     }
     loc filepath = filepath[1]
     loc storage = storage[1]
@@ -381,6 +406,30 @@ program define smartload__searchwindowsindex, rclass
     }
     file close `wh'
     return scalar used = 1
+    return scalar nposted = `nposted'
+end
+
+program define smartload__searchdriveroots, rclass
+    syntax , FILENAME(string) POST(string) LOGHANDLE(string) LOG(integer)
+    loc posth "`post'"
+    loc lh "`loghandle'"
+    loc logrequested "`log'"
+    loc nposted 0
+
+    if "`logrequested'" == "1" file write `lh' "Drive root direct checks:" _n
+    forvalues i = 67/90 {
+        loc d = char(`i')
+        loc root "`d':/"
+        mata: st_local("direx", strofreal(direxists(st_local("root"))))
+        if "`direx'" != "1" continue
+        mata: st_local("hit", pathjoin(st_local("root"), st_local("filename")))
+        cap confirm file `"`hit'"'
+        if !_rc {
+            post `posth' (`"`hit'"') (`"`root'"') ("local")
+            loc ++nposted
+            if "`logrequested'" == "1" file write `lh' "  `hit'" _n
+        }
+    }
     return scalar nposted = `nposted'
 end
 
