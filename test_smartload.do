@@ -9,13 +9,6 @@ if _rc {
     exit 601
 }
 
-cap which filelist
-if _rc {
-    di as error "The SSC package filelist is required."
-    di as txt "Run: ssc install filelist"
-    exit 499
-}
-
 local base "`c(tmpdir)'smartload_test"
 cap mkdir "`base'"
 cap mkdir "`base'\root1"
@@ -34,6 +27,7 @@ cap export excel using "`base'\root1\sample.xlsx", firstrow(variables) replace
 local xlsx_rc = _rc
 
 copy "`base'\root1\sample.csv" "`base'\root2\sample.csv", replace
+copy "`base'\root1\sample.dta" "`base'\root2\sample.dta", replace
 
 file open fh using "`base'\root1\future.parquet", write text replace
 file write fh "placeholder for unsupported conversion-based file"
@@ -54,32 +48,33 @@ file close fh
 di as txt "1. ado loads"
 which smartload
 
-di as txt "2. default no-location search no longer requires force"
-di as txt "   skipped here to avoid a whole-drive scan during the self-test"
+di as txt "2. pure Stata index refresh succeeds"
+smartload, refresh roots("`base'\root1;`base'\root2;`base'\empty") replace
+assert r(N) > 0
 
 di as txt "3. no match is reported"
-cap noi smartload does_not_exist.csv, search("`base'\empty")
+cap noi smartload does_not_exist.csv
 assert _rc != 0
 
-di as txt "4. multiple same-name files stop"
-cap noi smartload sample.csv, search("`base'\root1;`base'\root2") clear
-assert _rc != 0
+di as txt "4. multiple same-name files can be selected by number in batch"
+smartload sample.csv, choice(1) clear
+assert r(N) == 5
 
 di as txt "5. .dta import succeeds"
-smartload sample.dta, search("`base'\root1") clear log replace
+smartload sample.dta, choice(1) clear log replace
 assert r(N) == 5
 assert r(k) == 3
 assert "`r(extension)'" == "dta"
 
 di as txt "6. .csv import succeeds"
-smartload sample.csv, search("`base'\root1") clear
+smartload sample.csv, choice(1) clear
 assert r(N) == 5
 assert r(k) == 3
 assert "`r(importcmd)'" == "import delimited"
 
 di as txt "7. .xlsx import succeeds if export excel was available"
 if `xlsx_rc' == 0 {
-    smartload sample.xlsx, search("`base'\root1") firstrow clear
+    smartload sample.xlsx, firstrow clear
     assert r(N) == 5
     assert r(k) == 3
 }
@@ -88,11 +83,11 @@ else {
 }
 
 di as txt "8. .dat text-delimited candidate succeeds"
-smartload sample.dat, search("`base'\root1") clear
+smartload sample.dat, clear
 assert r(N) == 5
 
 di as txt "9. conversion-based file is detected but not imported"
-smartload future.parquet, search("`base'\root1") clear
+smartload future.parquet, clear
 assert "`r(status)'" == "detected_not_imported"
 
 di as txt "10. log output exists"
@@ -103,35 +98,24 @@ cap noi help smartload
 assert _rc == 0
 
 di as txt "12. multiple semicolon roots accepted"
-smartload sample.dta, search("`base'\empty;`base'\root1") clear
+smartload sample.dta, roots("`base'\root1") clear
 assert r(N) == 5
 
-di as txt "13. noeverything option is accepted"
-smartload sample.dta, search("`base'\root1") noeverything clear
+di as txt "13. duplicate choice selects requested copy"
+smartload sample.dta, choice(2) clear
 assert r(N) == 5
-
-di as txt "14. bare clear without comma is accepted in current-directory fast search"
-local oldpwd "`c(pwd)'"
-cd "`base'\root1"
-smartload sample.dta clear
-assert r(N) == 5
-cd "`oldpwd'"
-
-di as txt "15. selected unavailable drive letters are skipped"
-cap noi smartload definitely_absent_smartload_file.dta, drives(Z) clear
-assert _rc != 0
 
 di as txt "16. PDF is detected without pretending direct import"
-smartload report.pdf, search("`base'\root1") clear
+smartload report.pdf, clear
 assert "`r(status)'" == "detected_not_imported"
 
 di as txt "17. DOCX is detected"
-smartload report.docx, search("`base'\root1") clear
+smartload report.docx, clear
 assert "`r(status)'" == "detected_not_imported"
 
 di as txt "18. PPTX is detected"
-smartload slides.pptx, search("`base'\root1") clear
+smartload slides.pptx, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as result "All runnable smartload V0.1 tests completed."
+di as result "All runnable smartload V0.2.0 tests completed."
 log close smartload_selftest

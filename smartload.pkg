@@ -1,19 +1,17 @@
 v 3
-d smartload: universal data finder and cautious Stata data loader
-d Version: 0.1.1
+d smartload: universal indexed Stata data loader
+d Version: 0.2.0
 d
-d smartload searches requested local roots, drives, removable/external drives,
-d and local cloud-synced folders for an exact file name.  It imports only
-d formats supported reliably in the current version and reports conversion-
-d based formats without pretending they were loaded.
+d smartload loads data files by file name using a pure Stata index.
+d It does not call shell, PowerShell, Everything, Windows Search, or external search tools.
+d Refresh the index with: smartload, refresh
+d Load by name with: smartload Indicator.dta, clear
 d
 d Author: Hao Ma
 d Distribution-Date: 20260709
 d License: MIT
-d Requires: Stata 19.5; SSC package filelist
-d Install dependency first: ssc install filelist
-d Then install smartload with: net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
-d Everything ES (es.exe) is optional only; smartload does not require it
+d Requires: Stata 19.5
+d Install with: net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
 d
 f smartload.ado
 f smartload.sthlp
