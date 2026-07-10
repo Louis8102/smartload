@@ -1,11 +1,11 @@
 {smcl}
-{* *! version 0.2.1 09jul2026}{...}
+{* *! version 0.3.0 10jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
 
 {p2colset 5 20 22 2}{...}
-{p2col:{hi:smartload} {hline 2}}Load a named data file using a pure Stata file index{p_end}
+{p2col:{hi:smartload} {hline 2}}Find a named data file and load it into Stata{p_end}
 {p2colreset}{...}
 
 {title:Syntax}
@@ -19,60 +19,100 @@
 {cmd:sheet(}{it:sheetname}{cmd:)}
 {cmd:firstrow}
 {cmd:encoding(}{it:encoding}{cmd:)}
-{cmd:ocr}
 {cmd:log}
-{cmd:replace}]
+{cmd:replace}
+{cmd:maxdirs(}{it:#}{cmd:)}]
+
+{p 8 17 2}
+{cmd:smartload, setup}
 
 {p 8 17 2}
 {cmd:smartload, refresh}
 [{cmd:roots(}{it:roots}{cmd:)}
-{cmd:drives(}{it:drive-list|all}{cmd:)}
-{cmd:replace}]
+{cmd:drives(}{it:drive-list|all}{cmd:)}]
 
 {title:Description}
 
 {pstd}
-{cmd:smartload} loads a data file by exact file name.  Version 0.2.1 uses a
-pure Stata index stored in the user's PERSONAL ado directory.  It does not call
-{cmd:shell}, PowerShell, Everything, Windows Search, or external search tools.
+{cmd:smartload} loads a data file by exact file name.  The user does not need
+to remember the folder path.  Version 0.3.0 first searches the saved
+{cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
+over common user locations.
 
 {pstd}
-Build or refresh the index first:
-
-{phang2}{cmd:. smartload, refresh}{p_end}
-
-{pstd}
-Then load by file name:
+Daily use:
 
 {phang2}{cmd:. smartload Indicator.dta, clear}{p_end}
+{phang2}{cmd:. smartload survey.sav, clear}{p_end}
+{phang2}{cmd:. smartload panel.parquet, clear}{p_end}
+
+{pstd}
+Recommended first setup:
+
+{phang2}{cmd:. smartload, setup}{p_end}
 
 {title:Options}
 
 {phang}
-{cmd:refresh} rebuilds the pure Stata file index.  Without {cmd:roots()} or
-{cmd:drives()}, available drive roots from C through Z are indexed.
+{cmd:setup} opens an interactive menu:
+1. index common user folders; 2. index current project folder;
+3. index selected folders; 4. deep full-drive index (slow).
 
 {phang}
-{cmd:roots(}{it:roots}{cmd:)} restricts either an index refresh or an indexed
-lookup to one or more roots.  Separate multiple roots with semicolons.
+{cmd:refresh} rebuilds the Stata file index.  Without {cmd:roots()} or
+{cmd:drives()}, common user folders are indexed.  Full-drive indexing is never
+the default.
 
 {phang}
-{cmd:drives(}{it:drive-list|all}{cmd:)} controls which drive roots are indexed
-when used with {cmd:refresh}.
+{cmd:roots(}{it:roots}{cmd:)} restricts an index refresh or lookup to one or
+more roots.  Separate multiple roots with semicolons.
 
 {phang}
-{cmd:choice(}{it:#}{cmd:)} selects a file when several indexed files have the
-same name.  Interactive Stata users can instead type the displayed number when
+{cmd:drives(}{it:drive-list|all}{cmd:)} indexes selected drive roots when used
+with {cmd:refresh}.  {cmd:drives(all)} can be slow on large computers.
+
+{phang}
+{cmd:choice(}{it:#}{cmd:)} selects a file when several files have the same
+name.  Interactive Stata users can instead type the displayed number when
 prompted.
 
 {phang}
 {cmd:clear}, {cmd:sheet()}, {cmd:firstrow}, and {cmd:encoding()} are passed to
-relevant Stata import commands.
+the relevant Stata import commands.
+
+{phang}
+{cmd:maxdirs(}{it:#}{cmd:)} controls the folder budget for automatic fast
+search after an index miss.  The default is {cmd:maxdirs(2500)}.
+
+{title:Supported Native Formats}
+
+{pstd}
+{cmd:.dta} via {cmd:use}; {cmd:.xlsx} and {cmd:.xls} via {cmd:import excel};
+{cmd:.csv}, {cmd:.txt}, {cmd:.tsv}, and text-like {cmd:.dat} via
+{cmd:import delimited}; {cmd:.sav} and {cmd:.por} via {cmd:import spss};
+{cmd:.sas7bdat} via {cmd:import sas}; {cmd:.xpt} via {cmd:import sasxport};
+{cmd:.parquet} via {cmd:import parquet}.
+
+{pstd}
+For SPSS files, {cmd:smartload} uses Stata's native {cmd:import spss} so
+variable labels and value labels are preserved whenever Stata can preserve
+them.
+
+{title:Detected But Not Imported}
+
+{pstd}
+R files ({cmd:.rds}, {cmd:.rda}, {cmd:.RData}, {cmd:.r}) are detected but not
+imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
+{cmd:.csv}, then run {cmd:smartload} again.
+
+{pstd}
+DOCX, PPTX, and PDF files may contain tables, but they are document containers.
+Version 0.3.0 detects them but does not claim accurate table extraction.
 
 {title:Duplicate File Names}
 
 {pstd}
-If the same file name is indexed in multiple locations, {cmd:smartload} displays
+If the same file name appears in multiple locations, {cmd:smartload} displays
 all matching paths with Arabic numerals:
 
 {p 8 12 2}
@@ -84,40 +124,23 @@ all matching paths with Arabic numerals:
 In interactive Stata, type the number to import.  In batch mode, use
 {cmd:choice(#)}.
 
-{title:Supported Native Formats}
-
-{pstd}
-{cmd:.dta} via {cmd:use}; {cmd:.xlsx} and {cmd:.xls} via {cmd:import excel};
-{cmd:.csv}, {cmd:.txt}, {cmd:.tsv}, and text-like {cmd:.dat} via
-{cmd:import delimited}; {cmd:.sav} and {cmd:.por} via {cmd:import spss};
-{cmd:.sas7bdat} via {cmd:import sas}; {cmd:.xpt} via {cmd:import sasxport}.
-
-{pstd}
-The index records all files it can see under indexed roots, including files in
-hidden folders.  Loading is implemented for the supported Stata-readable formats
-above, not only {cmd:.dta}.
-
-{title:Recognized But Not Imported}
-
-{pstd}
-PDF, Word, PowerPoint, R, Python/data-science, GIS, database, and archive files
-are detected but not falsely imported.
-
 {title:Examples}
 
-{phang2}{cmd:. smartload, refresh}{p_end}
+{phang2}{cmd:. smartload, setup}{p_end}
 {phang2}{cmd:. smartload Indicator.dta, clear}{p_end}
 {phang2}{cmd:. smartload Indicator.dta, choice(2) clear}{p_end}
 {phang2}{cmd:. smartload city.sas7bdat, clear}{p_end}
+{phang2}{cmd:. smartload lake.parquet, clear}{p_end}
 {phang2}{cmd:. smartload workbook.xlsx, sheet("Sheet1") firstrow clear}{p_end}
-{phang2}{cmd:. smartload, refresh roots("C:\ANOVA;F:\Project") replace}{p_end}
+{phang2}{cmd:. smartload, refresh roots("F:\Project;G:\Data")}{p_end}
+{phang2}{cmd:. smartload, refresh drives(all)}   // slow{p_end}
 
 {title:Returned Results}
 
 {pstd}
 After successful import, {cmd:smartload} returns {cmd:r(filepath)},
 {cmd:r(filename)}, {cmd:r(extension)}, {cmd:r(importcmd)}, {cmd:r(storage)},
-{cmd:r(sourcekind)}, {cmd:r(indexfile)}, {cmd:r(N)}, and {cmd:r(k)}.
+{cmd:r(indexfile)}, {cmd:r(N)}, and {cmd:r(k)}.
 
 {title:License}
 

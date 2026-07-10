@@ -1,19 +1,23 @@
-*! smartload 0.2.1 09jul2026 Hao Ma
+*! smartload 0.3.0 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
-    syntax [anything(name=fname id="file name")] [, REFRESH ROOTS(string) ///
+    syntax [anything(name=fname id="file name")] [, SETUP REFRESH ROOTS(string) ///
         DRIVES(string) CHOICE(integer -1) CLEAR SHEET(string) FIRSTROW ///
-        ENCODING(string) TABLE(string) OBJECT(string) LAYER(string) ///
-        MEMBER(string) SLIDE(integer -1) TABLEINDEX(integer -1) ///
-        DOCTABLE(integer -1) PDFTABLE(integer -1) PPTTABLE(integer -1) ///
-        CLOUD(string) CLOUDROOT(string) OCR LOG REPLACE]
+        ENCODING(string) OCR LOG REPLACE MAXDIRS(integer 2500)]
 
     smartload__indexpath
     loc indexfile `"`r(indexfile)'"'
 
-    if "`refresh'" != "" {
-        smartload__refresh, indexfile(`"`indexfile'"') roots(`"`roots'"') drives(`"`drives'"') replace(`"`replace'"')
+    if "`setup'" != "" {
+        smartload__setup, indexfile(`"`indexfile'"')
         return local indexfile `"`indexfile'"'
+        exit
+    }
+
+    if "`refresh'" != "" {
+        smartload__refresh, indexfile(`"`indexfile'"') roots(`"`roots'"') drives(`"`drives'"')
+        return local indexfile `"`indexfile'"'
+        return scalar N = r(N)
         exit
     }
 
@@ -21,84 +25,70 @@ program define smartload, rclass
     local filename = subinstr(`"`filename'"', char(34), "", .)
     mata: st_local("filename", pathbasename(st_local("filename")))
     if `"`filename'"' == "" {
-        di as err "Please specify a file name, or run {cmd:smartload, refresh} to build the index."
+        di as err "Please specify a file name, or run {cmd:smartload, setup}."
         exit 198
     }
 
-    loc cmdline `"smartload `filename'"'
     loc logrequested = "`log'" != ""
     loc logfile "smartload_log.txt"
     tempname lh
     if `logrequested' {
         if "`replace'" != "" file open `lh' using "`logfile'", write text replace
         else file open `lh' using "`logfile'", write text append
-        file write `lh' "Command: `cmdline'" _n
+        file write `lh' "Command: smartload `filename'" _n
         file write `lh' "Date/time: `c(current_date)' `c(current_time)'" _n
     }
 
-    cap confirm file `"`indexfile'"'
-    if _rc {
-        di as err "smartload index was not found."
-        di as txt "Run this once to build a pure Stata file index:"
-        di as txt "{cmd:. smartload, refresh}"
-        if `logrequested' {
-            file write `lh' "Result: failure - index not found" _n _n
-            file close `lh'
-        }
-        exit 601
-    }
-
     preserve
-    qui use `"`indexfile'"', clear
-    cap confirm var filename
-    if _rc {
-        restore
-        di as err "smartload index is invalid. Rebuild it with {cmd:smartload, refresh}."
-        exit 459
-    }
-
-    qui keep if lower(filename) == lower(`"`filename'"')
-
-    if `"`roots'"' != "" {
-        gen str2045 __rootfilter = ""
-        loc rest `"`roots'"'
-        while `"`rest'"' != "" {
-            loc semi = strpos(`"`rest'"', ";")
-            if `semi' > 0 {
-                loc root = substr(`"`rest'"', 1, `semi' - 1)
-                loc rest = substr(`"`rest'"', `semi' + 1, strlen(`"`rest'"'))
-            }
-            else {
-                loc root `"`rest'"'
-                loc rest ""
-            }
-            loc root = strtrim(`"`root'"')
-            if `"`root'"' == "" continue
-            loc root = subinstr(`"`root'"', char(92), "/", .)
-            replace __rootfilter = "1" if strpos(lower(filepath), lower(`"`root'"')) == 1
+    cap confirm file `"`indexfile'"'
+    if !_rc {
+        qui use `"`indexfile'"', clear
+        cap confirm var filename
+        if _rc {
+            restore
+            di as err "smartload index is invalid. Rebuild it with {cmd:smartload, setup} or {cmd:smartload, refresh}."
+            exit 459
         }
-        qui keep if __rootfilter == "1"
-        drop __rootfilter
+        qui keep if lower(filename) == lower(`"`filename'"')
+        if `"`roots'"' != "" {
+            smartload__filterroots, roots(`"`roots'"')
+        }
+    }
+    else {
+        smartload__empty_matches
     }
 
     qui count
     loc nmatch = r(N)
     if `nmatch' == 0 {
         restore
-        di as err "No indexed file named `filename' was found."
-        di as txt "If the file was added or moved recently, run: {cmd:smartload, refresh}"
+        di as txt "No indexed match for `filename'. Running automatic fast search..."
+        tempfile quickmatches
+        smartload__quickfind, filename(`"`filename'"') roots(`"`roots'"') maxdirs(`maxdirs') saving(`"`quickmatches'"')
+        loc matchfile `"`quickmatches'"'
+        preserve
+        qui use `"`matchfile'"', clear
+        qui count
+        loc nmatch = r(N)
+    }
+
+    if `nmatch' == 0 {
+        restore
+        di as err "No file named `filename' was found in the index or fast search."
+        di as txt "Run {cmd:smartload, setup} to build an index, or {cmd:smartload, refresh roots(...)} for selected work folders."
         if `logrequested' {
-            file write `lh' "Result: failure - no indexed match" _n _n
+            file write `lh' "Result: failure - no match" _n _n
             file close `lh'
         }
         exit 601
     }
+
     qui duplicates drop filepath, force
     qui count
     loc nmatch = r(N)
 
     if `nmatch' > 1 {
-        di as err "Found multiple indexed files named `filename':"
+        di as err "Found multiple files named `filename':"
         forvalues i = 1/`nmatch' {
             loc p = filepath[`i']
             di as txt "`i'. `p'"
@@ -109,13 +99,9 @@ program define smartload, rclass
         }
         else {
             if c(mode) == "batch" {
-                di as err "File name is not unique. Batch mode cannot prompt for a choice."
-                di as txt "Use {cmd:choice(#)} or run interactively and choose a number."
-                if `logrequested' {
-                    file write `lh' "Result: failure - multiple matches in batch mode" _n _n
-                    file close `lh'
-                }
                 restore
+                di as err "File name is not unique. Batch mode cannot prompt for a choice."
+                di as txt "Use {cmd:choice(#)}."
                 exit 459
             }
             di as txt "Type the number of the file to import, then press Enter."
@@ -126,12 +112,8 @@ program define smartload, rclass
 
         cap confirm integer number `selected'
         if _rc | real("`selected'") < 1 | real("`selected'") > `nmatch' {
-            di as err "Invalid selection. No file was imported."
-            if `logrequested' {
-                file write `lh' "Result: failure - invalid multiple-match selection" _n _n
-                file close `lh'
-            }
             restore
+            di as err "Invalid selection. No file was imported."
             exit 198
         }
         qui keep in `selected'
@@ -140,11 +122,10 @@ program define smartload, rclass
     loc filepath = filepath[1]
     loc storage = storage[1]
     restore
-    loc loadpath = subinstr(`"`filepath'"', char(92), "/", .)
 
+    loc loadpath = subinstr(`"`filepath'"', char(92), "/", .)
     mata: st_local("ext", strlower(pathsuffix(st_local("filepath"))))
     loc ext : subinstr loc ext "." "", all
-    loc sourcekind "indexed"
     loc importcmd ""
 
     if `logrequested' {
@@ -188,16 +169,11 @@ program define smartload, rclass
         if "`opts'" != "" cap noi import delimited `"`loadpath'"', `opts'
         else cap noi import delimited `"`loadpath'"'
         if _rc {
-            di as err "Detected .dat file, but it could not be imported as a delimited rectangular text dataset."
-            di as err ".dat is a generic extension and may require user-specified parsing rules."
+            di as err "Detected .dat file, but it could not be imported as a rectangular delimited dataset."
             return local filepath `"`filepath'"'
             return local filename `"`filename'"'
             return local extension "`ext'"
             return local status "detected_not_imported"
-            if `logrequested' {
-                file write `lh' "Result: detected_not_imported - .dat import failed" _n _n
-                file close `lh'
-            }
             exit 459
         }
         loc importcmd "import delimited"
@@ -217,6 +193,11 @@ program define smartload, rclass
         else import sasxport using "`loadpath'"
         loc importcmd "import sasxport"
     }
+    else if "`ext'" == "parquet" {
+        if "`clear'" != "" import parquet using "`loadpath'", clear
+        else import parquet using "`loadpath'"
+        loc importcmd "import parquet"
+    }
     else {
         smartload__detected `"`filepath'"' "`filename'" "`ext'" "`lh'" "`logrequested'" "`ocr'"
         return local filepath `"`filepath'"'
@@ -231,7 +212,6 @@ program define smartload, rclass
     return local extension "`ext'"
     return local importcmd "`importcmd'"
     return local storage "`storage'"
-    return local sourcekind "`sourcekind'"
     return local indexfile `"`indexfile'"'
     qui ds
     loc k : word count `r(varlist)'
@@ -247,6 +227,7 @@ program define smartload, rclass
     else if inlist("`ext'", "csv", "txt", "tsv", "dat") loc typename "Delimited text candidate"
     else if inlist("`ext'", "sav", "por") loc typename "SPSS data file"
     else if inlist("`ext'", "sas7bdat", "xpt") loc typename "SAS data file"
+    else if "`ext'" == "parquet" loc typename "Parquet data file"
     di as txt "Detected type: `typename'"
     di as txt "Command used: `importcmd'"
     di as txt "Storage location: `storage'"
@@ -262,6 +243,41 @@ program define smartload, rclass
     }
 end
 
+program define smartload__empty_matches
+    version 19.5
+    qui clear
+    qui set obs 0
+    qui gen str2045 filepath = ""
+    qui gen str255 filename = ""
+    qui gen str2045 dirname = ""
+    qui gen str32 ext = ""
+    qui gen str20 storage = ""
+end
+
+program define smartload__filterroots
+    version 19.5
+    syntax , ROOTS(string)
+    qui gen str2045 __rootfilter = ""
+    loc rest `"`roots'"'
+    while `"`rest'"' != "" {
+        loc semi = strpos(`"`rest'"', ";")
+        if `semi' > 0 {
+            loc root = substr(`"`rest'"', 1, `semi' - 1)
+            loc rest = substr(`"`rest'"', `semi' + 1, strlen(`"`rest'"'))
+        }
+        else {
+            loc root `"`rest'"'
+            loc rest ""
+        }
+        loc root = strtrim(`"`root'"')
+        if `"`root'"' == "" continue
+        loc root = subinstr(`"`root'"', char(92), "/", .)
+        qui replace __rootfilter = "1" if strpos(lower(filepath), lower(`"`root'"')) == 1
+    }
+    qui keep if __rootfilter == "1"
+    qui drop __rootfilter
+end
+
 program define smartload__indexpath, rclass
     version 19.5
     loc base `"`c(sysdir_personal)'"'
@@ -271,22 +287,83 @@ program define smartload__indexpath, rclass
     return local indexfile `"`idx'"'
 end
 
+program define smartload__setup, rclass
+    version 19.5
+    syntax , INDEXFILE(string)
+    di as txt "smartload setup"
+    di as txt ""
+    di as txt "1. Index common user folders only"
+    di as txt "2. Index current project folder"
+    di as txt "3. Index selected folders"
+    di as txt "4. Deep full-drive index (slow)"
+    di as txt ""
+    if c(mode) == "batch" {
+        di as err "setup is interactive. In batch mode, use smartload, refresh roots(...) or drives(...)."
+        exit 459
+    }
+    di as txt "Type 1, 2, 3, or 4:"
+    cap macro drop SMARTLOAD_SETUP
+    display _request(SMARTLOAD_SETUP)
+    loc pick = strtrim("$SMARTLOAD_SETUP")
+
+    if "`pick'" == "1" {
+        smartload__defaultroots
+        smartload__refresh, indexfile(`"`indexfile'"') roots(`"`r(roots)'"')
+    }
+    else if "`pick'" == "2" {
+        smartload__refresh, indexfile(`"`indexfile'"') roots(`"`c(pwd)'"')
+    }
+    else if "`pick'" == "3" {
+        di as txt "Type selected folders separated by semicolons:"
+        cap macro drop SMARTLOAD_ROOTS
+        display _request(SMARTLOAD_ROOTS)
+        loc roots `"$SMARTLOAD_ROOTS"'
+        if `"`roots'"' == "" {
+            di as err "No folders were specified."
+            exit 198
+        }
+        smartload__refresh, indexfile(`"`indexfile'"') roots(`"`roots'"')
+    }
+    else if "`pick'" == "4" {
+        di as txt "Deep full-drive indexing can take many minutes."
+        smartload__refresh, indexfile(`"`indexfile'"') drives(all)
+    }
+    else {
+        di as err "Invalid setup choice."
+        exit 198
+    }
+end
+
+program define smartload__defaultroots, rclass
+    version 19.5
+    loc roots `"`c(pwd)'"'
+    loc home "C:/Users/`c(username)'"
+    foreach sub in Desktop Documents Downloads OneDrive "OneDrive/Documents" Dropbox "Google Drive" "My Drive" Box {
+        loc roots `"`roots';`home'/`sub'"'
+    }
+    forvalues i = 67/90 {
+        loc d = char(`i')
+        loc root "`d':/"
+        mata: st_local("direx", strofreal(direxists(st_local("root"))))
+        if "`direx'" == "1" loc roots `"`roots';`root'"'
+    }
+    return local roots `"`roots'"'
+end
+
 program define smartload__refresh, rclass
     version 19.5
-    syntax , INDEXFILE(string) [ROOTS(string) DRIVES(string) REPLACE(string)]
+    syntax , INDEXFILE(string) [ROOTS(string) DRIVES(string)]
 
     tempfile newindex
     tempname posth
     postfile `posth' str2045 filepath str255 filename str2045 dirname str32 ext str20 storage using `"`newindex'"', replace
 
-    loc scanned 0
     if `"`roots'"' != "" {
         smartload__scanroots, roots(`"`roots'"') post(`posth') storage(local)
-        loc scanned = `scanned' + r(nroots)
     }
-    else {
+    else if `"`drives'"' != "" {
         loc drives_l = lower(strtrim(`"`drives'"'))
-        if `"`drives_l'"' == "" | `"`drives_l'"' == "all" {
+        if `"`drives_l'"' == "all" {
             loc drvlist ""
             forvalues i = 67/90 {
                 loc d = char(`i')
@@ -294,7 +371,6 @@ program define smartload__refresh, rclass
             }
         }
         else loc drvlist `"`drives'"'
-
         foreach d of local drvlist {
             loc d = upper(strtrim("`d'"))
             local d : subinstr local d ":" "", all
@@ -304,8 +380,12 @@ program define smartload__refresh, rclass
             if "`direx'" != "1" continue
             di as txt "Indexing `root'"
             smartload__scanroot, root(`"`root'"') post(`posth') storage(local)
-            loc ++scanned
         }
+    }
+    else {
+        smartload__defaultroots
+        di as txt "Indexing common user folders. Use drives(all) only for slow deep indexing."
+        smartload__scanroots, roots(`"`r(roots)'"') post(`posth') storage(local)
     }
 
     postclose `posth'
@@ -374,16 +454,6 @@ program define smartload__scanroot, rclass
         loc cur = dirname[1]
         qui replace done = 1 in 1
 
-        loc cur_l = lower(`"`cur'"')
-        loc skip 0
-        foreach bad in "/windows" "/program files" "/program files (x86)" "/programdata" "/$recycle.bin" "/system volume information" "/recovery" {
-            if strpos(`"`cur_l'"', `"`bad'"') loc skip 1
-        }
-        if `skip' {
-            qui count if done == 0
-            continue
-        }
-
         cap local files : dir `"`cur'"' files "*"
         if !_rc {
             foreach f of local files {
@@ -391,7 +461,7 @@ program define smartload__scanroot, rclass
                 mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
                 loc ext : subinstr loc ext "." "", all
                 loc extok 0
-                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt pdf docx doc pptx ppt rds rdata r parquet feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
+                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt parquet pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
                     if "`ext'" == "`ok'" loc extok 1
                 }
                 if `extok' {
@@ -420,11 +490,113 @@ program define smartload__scanroot, rclass
                 qui replace done = 0 in L
             }
         }
-
         qui count if done == 0
     }
     restore
     return scalar nfiles = `nfiles'
+end
+
+program define smartload__quickfind, rclass
+    version 19.5
+    syntax , FILENAME(string) SAVING(string) [ROOTS(string) MAXDIRS(integer 2500)]
+    if `"`roots'"' == "" {
+        smartload__defaultroots
+        loc roots `"`r(roots)'"'
+    }
+
+    tempname posth
+    postfile `posth' str2045 filepath str255 filename str2045 dirname str32 ext str20 storage using `"`saving'"', replace
+
+    loc target = subinstr(`"`filename'"', char(92), "/", .)
+    mata: st_local("target", pathbasename(st_local("target")))
+    mata: st_local("target_l", strlower(st_local("target")))
+    mata: st_local("target_ext", strlower(pathsuffix(st_local("target"))))
+    loc target_ext : subinstr loc target_ext "." "", all
+    loc visited 0
+
+    preserve
+    qui clear
+    qui set obs 0
+    qui gen str2045 dirname = ""
+    qui gen byte done = 0
+
+    loc rest `"`roots'"'
+    while `"`rest'"' != "" {
+        loc semi = strpos(`"`rest'"', ";")
+        if `semi' > 0 {
+            loc root = substr(`"`rest'"', 1, `semi' - 1)
+            loc rest = substr(`"`rest'"', `semi' + 1, strlen(`"`rest'"'))
+        }
+        else {
+            loc root `"`rest'"'
+            loc rest ""
+        }
+        loc root = strtrim(`"`root'"')
+        if `"`root'"' == "" continue
+        loc root = subinstr(`"`root'"', char(92), "/", .)
+        mata: st_local("direx", strofreal(direxists(st_local("root"))))
+        if "`direx'" != "1" continue
+        qui set obs `=_N + 1'
+        qui replace dirname = `"`root'"' in L
+        qui replace done = 0 in L
+    }
+
+    qui count if done == 0
+    while r(N) > 0 & `visited' < `maxdirs' {
+        sort done dirname
+        loc cur = dirname[1]
+        qui replace done = 1 in 1
+        loc ++visited
+
+        cap local files : dir `"`cur'"' files "`target'"
+        if !_rc {
+            foreach f of local files {
+                if lower(`"`f'"') == `"`target_l'"' {
+                    mata: st_local("full", pathjoin(st_local("cur"), st_local("f")))
+                    post `posth' (`"`full'"') (`"`f'"') (`"`cur'"') ("`target_ext'") ("fast")
+                }
+            }
+        }
+
+        cap local dirs : dir `"`cur'"' dirs "*"
+        if !_rc {
+            foreach sub of local dirs {
+                if `"`sub'"' == "." | `"`sub'"' == ".." continue
+                mata: st_local("child", pathjoin(st_local("cur"), st_local("sub")))
+                loc child = subinstr(`"`child'"', char(92), "/", .)
+                mata: st_local("childex", strofreal(direxists(st_local("child"))))
+                if "`childex'" != "1" continue
+                loc child_l = lower(`"`child'"')
+                loc badchild 0
+                foreach bad in "/windows" "/program files" "/program files (x86)" "/programdata" "/$recycle.bin" "/system volume information" "/recovery" {
+                    if strpos(`"`child_l'"', `"`bad'"') loc badchild 1
+                }
+                if `badchild' continue
+                qui set obs `=_N + 1'
+                qui replace dirname = `"`child'"' in L
+                qui replace done = 0 in L
+            }
+        }
+        qui count if done == 0
+    }
+    restore
+    postclose `posth'
+
+    preserve
+    qui use `"`saving'"', clear
+    qui count
+    if r(N) > 0 {
+        qui duplicates drop filepath, force
+    }
+    qui save `"`saving'"', replace
+    qui count
+    loc n = r(N)
+    restore
+
+    di as txt "Fast search checked `visited' folders."
+    return local matchfile `"`saving'"'
+    return scalar N = `n'
+    return scalar visited = `visited'
 end
 
 program define smartload__detected, rclass
@@ -433,49 +605,24 @@ program define smartload__detected, rclass
     if inlist("`ext'", "pdf") loc kind "PDF/document-table"
     else if inlist("`ext'", "docx", "doc") loc kind "Word/document-table"
     else if inlist("`ext'", "pptx", "ppt") loc kind "PowerPoint/presentation-table"
+    else if inlist("`ext'", "rds", "rda", "rdata", "r") loc kind "R"
     else if inlist("`ext'", "zip", "gz", "7z", "tar") loc kind "archive"
     else if inlist("`ext'", "sqlite", "db", "duckdb", "accdb", "mdb", "sql") loc kind "database"
     else if inlist("`ext'", "shp", "geojson", "gpkg", "kml", "kmz", "gdb") loc kind "GIS"
-    else if inlist("`ext'", "rds", "rdata", "r") loc kind "R"
-    else if inlist("`ext'", "parquet", "feather", "pkl", "pickle", "arrow", "h5", "hdf5", "json", "jsonl") loc kind "Python/data-science"
+    else if inlist("`ext'", "feather", "pkl", "pickle", "arrow", "h5", "hdf5", "json", "jsonl") loc kind "Python/data-science"
+
     di as txt "Detected `kind' file: .`ext'"
-    if inlist("`ext'", "pdf") {
-        di as err "PDF files are document files, not ordinary Stata datasets."
-        di as txt "smartload does not import PDF tables in the current version unless a tested external extraction engine is added."
-        di as txt "This includes PDFs that visually contain Excel-like tables."
-        if "`ocr'" == "" {
-            di as txt "Scanned or image-based PDFs require OCR and are not imported automatically."
-        }
+    if inlist("`ext'", "rds", "rda", "rdata", "r") {
+        di as err "R data files are detected but not imported automatically in this version."
+        di as txt "Convert in R to .dta, .parquet, or .csv, then run smartload again."
+        di as txt `"Examples: haven::write_dta(df, "data.dta"); arrow::write_parquet(df, "data.parquet")."'
     }
-    else if inlist("`ext'", "docx", "doc") {
-        di as err "Word files require table extraction before Stata can import them."
-        di as txt "Current version detects this file but does not claim a successful table import."
-    }
-    else if inlist("`ext'", "pptx", "ppt") {
-        di as err "PowerPoint files require extraction of real table objects before Stata can import them."
-        di as txt "Images, screenshots, charts, and table-like pictures are not treated as reliable tables."
-    }
-    else if inlist("`ext'", "zip", "gz", "7z", "tar") {
-        di as err "Archive inspection/extraction is reserved for a tested conversion path."
-        di as txt "No files were extracted."
-    }
-    else if inlist("`ext'", "sqlite", "db", "duckdb", "accdb", "mdb", "sql") {
-        di as err "Database files require table inspection through ODBC, Python, R, or another tested bridge."
-        if "`ext'" == "sql" di as txt ".sql is usually a script or dump, not a rectangular dataset."
-    }
-    else if inlist("`ext'", "shp", "geojson", "gpkg", "kml", "kmz", "gdb") {
-        di as err "GIS files require a tested GIS conversion workflow before import."
-        if "`ext'" == "shp" di as txt "A shapefile also requires companion files such as .shx and .dbf."
-    }
-    else if inlist("`ext'", "rds", "rdata", "r") {
-        di as err "R data files require R/Rscript conversion before Stata can import them."
-    }
-    else if inlist("`ext'", "parquet", "feather", "pkl", "pickle", "arrow", "h5", "hdf5", "json", "jsonl") {
-        di as err "Python/data-science files require inspected conversion before Stata can import them."
-        if inlist("`ext'", "pkl", "pickle") di as txt "Pickle files are not imported automatically because they may be unsafe and may not contain rectangular data."
+    else if inlist("`ext'", "docx", "doc", "pptx", "ppt", "pdf") {
+        di as err "Document table extraction is not enabled in this version."
+        di as txt "DOCX, PPTX, and PDF may contain tables, but they are document containers, not reliable rectangular data files."
     }
     else {
-        di as err "This file type is not safely importable by smartload."
+        di as err "This file type is detected but not safely importable by smartload in this version."
     }
     if "`logrequested'" == "1" {
         file write `lh' "Result: detected_not_imported" _n _n

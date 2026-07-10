@@ -1,14 +1,15 @@
 v 3
-d smartload: universal indexed Stata data loader
-d Version: 0.2.1
+d smartload: find a named data file and load it into Stata
+d Version: 0.3.0
 d
-d smartload loads data files by file name using a pure Stata index.
-d It does not call shell, PowerShell, Everything, Windows Search, or external search tools.
-d Refresh the index with: smartload, refresh
+d smartload loads data files by file name without requiring the folder path.
+d It imports DTA, Excel, CSV/text, SPSS, SAS, XPT, and Parquet using native Stata commands.
+d It detects but does not automatically import R files or DOCX/PPT/PDF document tables.
+d Use smartload, setup for a guided index setup.
 d Load by name with: smartload Indicator.dta, clear
 d
 d Author: Hao Ma
-d Distribution-Date: 20260709
+d Distribution-Date: 20260710
 d License: MIT
 d Requires: Stata 19.5
 d Install with: net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
