@@ -1,4 +1,4 @@
-*! smartload 0.3.3 10jul2026 Hao Ma
+*! smartload 0.3.4 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -294,6 +294,8 @@ program define smartload__everything, rclass
 
     cap confirm file `"`out'"'
     if _rc {
+        di as txt "Everything command-line search did not return results; falling back to smartload index/search."
+        di as txt "If this persists, open Everything once and make sure it is running."
         postclose `posth'
         return scalar N = 0
         exit
@@ -313,7 +315,13 @@ program define smartload__everything, rclass
         if `"`p'"' != "" {
             mata: st_local("base", pathbasename(st_local("p")))
             if lower(`"`base'"') == lower(`"`filename'"') {
-                mata: st_local("dir", pathdirname(st_local("p")))
+                loc pn = subinstr(`"`p'"', char(92), "/", .)
+                loc slash = 0
+                forvalues i = 1/`=strlen(`"`pn'"')' {
+                    if substr(`"`pn'"', `i', 1) == "/" loc slash = `i'
+                }
+                loc dir = ""
+                if `slash' > 1 loc dir = substr(`"`pn'"', 1, `slash' - 1)
                 mata: st_local("ext", strlower(pathsuffix(st_local("p"))))
                 loc ext : subinstr loc ext "." "", all
                 post `posth' (`"`p'"') (`"`base'"') (`"`dir'"') (`"`ext'"') ("everything")

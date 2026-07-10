@@ -1,4 +1,4 @@
-# smartload V0.3.3 Notes
+# smartload V0.3.4 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
 
@@ -16,7 +16,7 @@ smartload panel.parquet, clear
 
 ## Installation
 
-V0.3.3 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
+V0.3.4 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -80,7 +80,7 @@ When you run:
 smartload filename.ext, clear
 ```
 
-V0.3.3 uses this order:
+V0.3.4 uses this order:
 
 1. On Windows, use Everything's command-line interface `es.exe` if available.
 2. Search `smartload_index.dta`, if it exists.
@@ -95,7 +95,7 @@ smartload, installes
 
 The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
 
-V0.3.3 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+V0.3.4 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
 
 ```stata
 smartload, refresh drives(all)
@@ -123,7 +123,7 @@ smartload Indicator.dta, choice(2) clear
 
 ## Supported Native Imports
 
-V0.3.3 imports Stata-readable data files through Stata's native commands:
+V0.3.4 imports Stata-readable data files through Stata's native commands:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -137,7 +137,7 @@ For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable lab
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.3.3:
+These files are indexed/detected but not automatically imported in V0.3.4:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
 - Document containers: `.docx`, `.doc`, `.pptx`, `.ppt`, `.pdf`
@@ -146,7 +146,7 @@ These files are indexed/detected but not automatically imported in V0.3.3:
 
 R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
 
-DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.3 detects them but does not claim accurate table extraction.
+DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.4 detects them but does not claim accurate table extraction.
 
 ## Files
 
@@ -168,7 +168,7 @@ smartload/
 
 ## Version
 
-- Version: 0.3.3
+- Version: 0.3.4
 - Date: 2026-07-10
 - Author: Hao Ma
 - License: MIT

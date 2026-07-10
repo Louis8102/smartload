@@ -143,5 +143,5 @@ di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as result "All runnable smartload V0.3.3 tests completed."
+di as result "All runnable smartload V0.3.4 tests completed."
 log close smartload_selftest

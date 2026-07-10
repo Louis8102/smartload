@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.3.3 10jul2026}{...}
+{* *! version 0.3.4 10jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -38,7 +38,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.3.3 first uses Everything's
+to remember the folder path.  Version 0.3.4 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -126,7 +126,7 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.3.3 detects them but does not claim accurate table extraction.
+Version 0.3.4 detects them but does not claim accurate table extraction.
 
 {title:Duplicate File Names}
 
