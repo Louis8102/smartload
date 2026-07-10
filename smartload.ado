@@ -1,7 +1,7 @@
-*! smartload 0.3.0 10jul2026 Hao Ma
+*! smartload 0.3.3 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
-    syntax [anything(name=fname id="file name")] [, SETUP REFRESH ROOTS(string) ///
+    syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
         DRIVES(string) CHOICE(integer -1) CLEAR SHEET(string) FIRSTROW ///
         ENCODING(string) OCR LOG REPLACE MAXDIRS(integer 2500)]
 
@@ -11,6 +11,11 @@ program define smartload, rclass
     if "`setup'" != "" {
         smartload__setup, indexfile(`"`indexfile'"')
         return local indexfile `"`indexfile'"'
+        exit
+    }
+
+    if "`installes'" != "" {
+        smartload__installes
         exit
     }
 
@@ -39,9 +44,17 @@ program define smartload, rclass
         file write `lh' "Date/time: `c(current_date)' `c(current_time)'" _n
     }
 
+    tempfile sysmatches
+    smartload__everything, filename(`"`filename'"') saving(`"`sysmatches'"')
+    loc sysN = r(N)
+
     preserve
-    cap confirm file `"`indexfile'"'
-    if !_rc {
+    if `sysN' > 0 {
+        qui use `"`sysmatches'"', clear
+    }
+    else {
+        cap confirm file `"`indexfile'"'
+        if !_rc {
         qui use `"`indexfile'"', clear
         cap confirm var filename
         if _rc {
@@ -53,9 +66,10 @@ program define smartload, rclass
         if `"`roots'"' != "" {
             smartload__filterroots, roots(`"`roots'"')
         }
-    }
-    else {
-        smartload__empty_matches
+        }
+        else {
+            smartload__empty_matches
+        }
     }
 
     qui count
@@ -83,7 +97,9 @@ program define smartload, rclass
         exit 601
     }
 
-    qui duplicates drop filepath, force
+    qui gen str2045 __fp_l = lower(filepath)
+    qui duplicates drop __fp_l, force
+    qui drop __fp_l
     qui count
     loc nmatch = r(N)
 
@@ -243,6 +259,175 @@ program define smartload, rclass
     }
 end
 
+program define smartload__everything, rclass
+    version 19.5
+    syntax , FILENAME(string) SAVING(string)
+
+    tempname posth
+    postfile `posth' str2045 filepath str255 filename str2045 dirname str32 ext str20 storage using `"`saving'"', replace
+    loc n 0
+
+    if "`c(os)'" != "Windows" {
+        postclose `posth'
+        return scalar N = 0
+        exit
+    }
+
+    smartload__espath
+    loc es `"`r(es)'"'
+
+    if `"`es'"' == "" {
+        cap confirm file "C:/Program Files/Everything/Everything.exe"
+        if !_rc {
+            di as txt "Everything is installed, but smartload did not find es.exe."
+            di as txt "Install the Everything Command-line Interface (ES) from voidtools for instant smartload search."
+        }
+        postclose `posth'
+        return scalar N = 0
+        exit
+    }
+
+    tempfile out
+    loc query `"`filename'"'
+    loc cmd `""`es'" -n 200 -s -export-txt "`out'" "`query'""'
+    qui cap shell `cmd'
+
+    cap confirm file `"`out'"'
+    if _rc {
+        postclose `posth'
+        return scalar N = 0
+        exit
+    }
+
+    tempname fh
+    cap file open `fh' using `"`out'"', read text
+    if _rc {
+        postclose `posth'
+        return scalar N = 0
+        exit
+    }
+
+    file read `fh' line
+    while r(eof) == 0 {
+        loc p = strtrim(`"`line'"')
+        if `"`p'"' != "" {
+            mata: st_local("base", pathbasename(st_local("p")))
+            if lower(`"`base'"') == lower(`"`filename'"') {
+                mata: st_local("dir", pathdirname(st_local("p")))
+                mata: st_local("ext", strlower(pathsuffix(st_local("p"))))
+                loc ext : subinstr loc ext "." "", all
+                post `posth' (`"`p'"') (`"`base'"') (`"`dir'"') (`"`ext'"') ("everything")
+                loc ++n
+            }
+        }
+        file read `fh' line
+    }
+    file close `fh'
+    postclose `posth'
+
+    preserve
+    qui use `"`saving'"', clear
+    qui count
+    if r(N) > 0 {
+        qui gen str2045 __fp_l = lower(filepath)
+        qui duplicates drop __fp_l, force
+        qui drop __fp_l
+    }
+    qui save `"`saving'"', replace
+    qui count
+    loc n = r(N)
+    restore
+
+    if `n' > 0 di as txt "Searching with Everything..."
+    return scalar N = `n'
+end
+
+program define smartload__espath, rclass
+    version 19.5
+    loc es ""
+    loc base `"`c(sysdir_personal)'"'
+    if `"`base'"' == "" loc base `"`c(tmpdir)'"'
+    mata: st_local("personal_es", pathjoin(pathjoin(st_local("base"), "smartload_bin"), "es.exe"))
+    foreach p in ///
+        `"`personal_es'"' ///
+        "C:/Program Files/Everything/es.exe" ///
+        "C:/Program Files (x86)/Everything/es.exe" ///
+        "C:/Tools/Everything/es.exe" ///
+        "C:/Users/`c(username)'/AppData/Local/Everything/es.exe" ///
+        "C:/Users/`c(username)'/AppData/Roaming/Everything/es.exe" {
+        cap confirm file `"`p'"'
+        if !_rc & `"`es'"' == "" loc es `"`p'"'
+    }
+    return local es `"`es'"'
+end
+
+program define smartload__installes, rclass
+    version 19.5
+    if "`c(os)'" != "Windows" {
+        di as err "smartload, installes is only for Windows."
+        exit 459
+    }
+
+    loc base `"`c(sysdir_personal)'"'
+    if `"`base'"' == "" loc base `"`c(tmpdir)'"'
+    mata: st_local("bindir", pathjoin(st_local("base"), "smartload_bin"))
+    cap mkdir `"`bindir'"'
+
+    loc tmp `"`c(tmpdir)'"'
+    mata: st_local("zip", pathjoin(st_local("tmp"), "smartload_es.zip"))
+
+    di as txt "Downloading Everything Command-line Interface (ES) from voidtools..."
+    loc gotzip 0
+    foreach url in ///
+        "https://www.voidtools.com/ES-1.1.0.30.x64.zip" ///
+        "http://www.voidtools.com/ES-1.1.0.30.x64.zip" {
+        cap copy `"`url'"' `"`zip'"', replace
+        if !_rc {
+            loc gotzip 1
+            continue, break
+        }
+    }
+    if !`gotzip' {
+        di as txt "Stata download failed; trying Windows curl..."
+        cap shell curl.exe -L --fail --silent --show-error -o `"`zip'"' "https://www.voidtools.com/ES-1.1.0.30.x64.zip"
+        cap confirm file `"`zip'"'
+        if !_rc loc gotzip 1
+    }
+    if !`gotzip' {
+        di as err "Download failed."
+        di as txt "Manual download page: https://www.voidtools.com/downloads/"
+        di as txt "Choose ES-1.1.0.30.x64.zip and place es.exe in:"
+        di as txt `"`bindir'"'
+        di as txt "Everything itself must also be installed and running."
+        exit 601
+    }
+
+    loc oldpwd `"`c(pwd)'"'
+    qui cd `"`bindir'"'
+    cap unzipfile `"`zip'"', replace
+    loc unzip_rc = _rc
+    qui cd `"`oldpwd'"'
+    if `unzip_rc' {
+        di as err "Downloaded ES zip, but unzip failed."
+        di as txt `"`zip'"'
+        exit 601
+    }
+
+    mata: st_local("es", pathjoin(st_local("bindir"), "es.exe"))
+    cap confirm file `"`es'"'
+    if _rc {
+        di as err "Could not find es.exe after unzip."
+        di as txt "Please unzip ES-1.1.0.30.x64.zip manually and place es.exe in:"
+        di as txt `"`bindir'"'
+        exit 601
+    }
+
+    di as res "Everything Command-line Interface installed for smartload."
+    di as txt "ES path: `es'"
+    di as txt "Make sure Everything is installed and running."
+    return local es `"`es'"'
+end
+
 program define smartload__empty_matches
     version 19.5
     qui clear
@@ -345,7 +530,12 @@ program define smartload__defaultroots, rclass
         loc d = char(`i')
         loc root "`d':/"
         mata: st_local("direx", strofreal(direxists(st_local("root"))))
-        if "`direx'" == "1" loc roots `"`roots';`root'"'
+        if "`direx'" == "1" {
+            loc roots `"`roots';`root'"'
+            foreach sub in data Data dataset Dataset datasets Datasets project Project projects Projects {
+                loc roots `"`roots';`root'`sub'"'
+            }
+        }
     }
     return local roots `"`roots'"'
 end
@@ -536,6 +726,15 @@ program define smartload__quickfind, rclass
         loc root = subinstr(`"`root'"', char(92), "/", .)
         mata: st_local("direx", strofreal(direxists(st_local("root"))))
         if "`direx'" != "1" continue
+        cap local files : dir `"`root'"' files "`target'"
+        if !_rc {
+            foreach f of local files {
+                if lower(`"`f'"') == `"`target_l'"' {
+                    mata: st_local("full", pathjoin(st_local("root"), st_local("f")))
+                    post `posth' (`"`full'"') (`"`f'"') (`"`root'"') ("`target_ext'") ("fast")
+                }
+            }
+        }
         qui set obs `=_N + 1'
         qui replace dirname = `"`root'"' in L
         qui replace done = 0 in L

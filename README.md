@@ -1,4 +1,4 @@
-# smartload V0.3.0 Notes
+# smartload V0.3.3 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
 
@@ -12,11 +12,11 @@ smartload workbook.xlsx, firstrow clear
 smartload panel.parquet, clear
 ```
 
-`smartload` first tries its Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan.
+`smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan.
 
 ## Installation
 
-V0.3.0 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
+V0.3.3 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -26,6 +26,20 @@ help smartload
 ```
 
 No SSC dependency is required.
+
+## Optional Everything Accelerator
+
+On Windows, `smartload` can use Everything for near-instant file-name search, but Stata needs the Everything command-line interface `es.exe`.
+
+If Everything is already installed, run this once in Stata:
+
+```stata
+smartload, installes
+```
+
+This downloads the official 64-bit `ES-1.1.0.30.x64.zip` from voidtools, unzips `es.exe`, and stores it in the user's PERSONAL ado folder under `smartload_bin`. No administrator permission is needed for this ES placement. `smartload` first uses Stata's own downloader; if that fails on Windows, it tries the system `curl.exe`.
+
+Important: `es.exe` is not Everything itself. Everything must already be installed and running. If Everything is not installed/running, or if the computer blocks downloads from Stata, `smartload` falls back to its saved Stata index and bounded fast search.
 
 ## Recommended First Setup
 
@@ -66,20 +80,29 @@ When you run:
 smartload filename.ext, clear
 ```
 
-V0.3.0 uses this order:
+V0.3.3 uses this order:
 
-1. Search `smartload_index.dta`, if it exists.
-2. If no indexed match is found, run a bounded fast search over common locations.
-3. If no match is found, ask the user to run `smartload, setup` or refresh selected folders.
+1. On Windows, use Everything's command-line interface `es.exe` if available.
+2. Search `smartload_index.dta`, if it exists.
+3. If no indexed match is found, run a bounded fast search over common locations.
+4. If no match is found, ask the user to run `smartload, setup` or refresh selected folders.
 
-V0.3.0 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+Everything GUI alone is not enough for automatic Stata integration. `smartload` needs `es.exe`, the Everything Command-line Interface from voidtools. If Everything is installed but `es.exe` is missing, run:
+
+```stata
+smartload, installes
+```
+
+The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
+
+V0.3.3 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
 
 ```stata
 smartload, refresh drives(all)
 smartload, refresh drives(C F)
 ```
 
-Future versions may add optional accelerators such as Everything on Windows, Spotlight on macOS, or locate/plocate on Linux when a stable command-line interface is available.
+Future versions may add additional optional accelerators such as Spotlight on macOS or locate/plocate on Linux when a stable command-line interface is available.
 
 ## Duplicate File Names
 
@@ -100,7 +123,7 @@ smartload Indicator.dta, choice(2) clear
 
 ## Supported Native Imports
 
-V0.3.0 imports Stata-readable data files through Stata's native commands:
+V0.3.3 imports Stata-readable data files through Stata's native commands:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -114,7 +137,7 @@ For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable lab
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.3.0:
+These files are indexed/detected but not automatically imported in V0.3.3:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
 - Document containers: `.docx`, `.doc`, `.pptx`, `.ppt`, `.pdf`
@@ -123,7 +146,7 @@ These files are indexed/detected but not automatically imported in V0.3.0:
 
 R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
 
-DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.0 detects them but does not claim accurate table extraction.
+DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.3 detects them but does not claim accurate table extraction.
 
 ## Files
 
@@ -145,7 +168,7 @@ smartload/
 
 ## Version
 
-- Version: 0.3.0
+- Version: 0.3.3
 - Date: 2026-07-10
 - Author: Hao Ma
 - License: MIT

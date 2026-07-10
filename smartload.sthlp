@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.3.0 10jul2026}{...}
+{* *! version 0.3.3 10jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -27,6 +27,9 @@
 {cmd:smartload, setup}
 
 {p 8 17 2}
+{cmd:smartload, installes}
+
+{p 8 17 2}
 {cmd:smartload, refresh}
 [{cmd:roots(}{it:roots}{cmd:)}
 {cmd:drives(}{it:drive-list|all}{cmd:)}]
@@ -35,7 +38,8 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.3.0 first searches the saved
+to remember the folder path.  Version 0.3.3 first uses Everything's
+{cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
 
@@ -57,6 +61,14 @@ Recommended first setup:
 {cmd:setup} opens an interactive menu:
 1. index common user folders; 2. index current project folder;
 3. index selected folders; 4. deep full-drive index (slow).
+
+{phang}
+{cmd:installes} downloads the official 64-bit Everything command-line
+interface, {cmd:ES-1.1.0.30.x64.zip}, from voidtools and places
+{cmd:es.exe} under the user's PERSONAL ado folder in {cmd:smartload_bin}.
+It first tries Stata's downloader and then Windows {cmd:curl.exe}.  This
+option is for Windows.  It installs only ES, not Everything itself.
+Everything must already be installed and running for ES searches to work.
 
 {phang}
 {cmd:refresh} rebuilds the Stata file index.  Without {cmd:roots()} or
@@ -84,6 +96,13 @@ the relevant Stata import commands.
 {cmd:maxdirs(}{it:#}{cmd:)} controls the folder budget for automatic fast
 search after an index miss.  The default is {cmd:maxdirs(2500)}.
 
+{pstd}
+On Windows, Everything must expose the command-line interface {cmd:es.exe} for
+automatic use by {cmd:smartload}.  If Everything is installed but {cmd:es.exe}
+is missing, run {cmd:smartload, installes}.  If Everything itself is not
+installed or not running, {cmd:smartload} falls back to its Stata index/search
+path.
+
 {title:Supported Native Formats}
 
 {pstd}
@@ -107,7 +126,7 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.3.0 detects them but does not claim accurate table extraction.
+Version 0.3.3 detects them but does not claim accurate table extraction.
 
 {title:Duplicate File Names}
 
@@ -127,6 +146,7 @@ In interactive Stata, type the number to import.  In batch mode, use
 {title:Examples}
 
 {phang2}{cmd:. smartload, setup}{p_end}
+{phang2}{cmd:. smartload, installes}{p_end}
 {phang2}{cmd:. smartload Indicator.dta, clear}{p_end}
 {phang2}{cmd:. smartload Indicator.dta, choice(2) clear}{p_end}
 {phang2}{cmd:. smartload city.sas7bdat, clear}{p_end}
