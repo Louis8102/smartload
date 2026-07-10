@@ -1,6 +1,6 @@
 v 3
 d smartload: universal indexed Stata data loader
-d Version: 0.2.0
+d Version: 0.2.1
 d
 d smartload loads data files by file name using a pure Stata index.
 d It does not call shell, PowerShell, Everything, Windows Search, or external search tools.

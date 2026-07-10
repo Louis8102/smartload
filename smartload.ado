@@ -1,4 +1,4 @@
-*! smartload 0.2.0 09jul2026 Hao Ma
+*! smartload 0.2.1 09jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, REFRESH ROOTS(string) ///
@@ -390,8 +390,14 @@ program define smartload__scanroot, rclass
                 mata: st_local("full", pathjoin(st_local("cur"), st_local("f")))
                 mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
                 loc ext : subinstr loc ext "." "", all
-                post `posth' (`"`full'"') (`"`f'"') (`"`cur'"') (`"`ext'"') ("`storage'")
-                loc ++nfiles
+                loc extok 0
+                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt pdf docx doc pptx ppt rds rdata r parquet feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
+                    if "`ext'" == "`ok'" loc extok 1
+                }
+                if `extok' {
+                    post `posth' (`"`full'"') (`"`f'"') (`"`cur'"') (`"`ext'"') ("`storage'")
+                    loc ++nfiles
+                }
             }
         }
 
@@ -409,12 +415,9 @@ program define smartload__scanroot, rclass
                     if strpos(`"`child_l'"', `"`bad'"') loc badchild 1
                 }
                 if `badchild' continue
-                qui count if dirname == `"`child'"'
-                if r(N) == 0 {
-                    qui set obs `=_N + 1'
-                    qui replace dirname = `"`child'"' in L
-                    qui replace done = 0 in L
-                }
+                qui set obs `=_N + 1'
+                qui replace dirname = `"`child'"' in L
+                qui replace done = 0 in L
             }
         }
 

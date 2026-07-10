@@ -1,8 +1,8 @@
-# smartload V0.2.0 Notes
+# smartload V0.2.1 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma.  It lets users load a data file by file name without remembering the folder path.
 
-Version 0.2.0 uses a pure Stata indexing system.  It does not call `shell`, PowerShell, Everything, Windows Search, or any non-Stata search tool.
+Version 0.2.1 uses a pure Stata indexing system.  It does not call `shell`, PowerShell, Everything, Windows Search, or any non-Stata search tool.
 
 ## Installation
 
@@ -64,7 +64,7 @@ The index is stored as `smartload_index.dta` in the user PERSONAL ado directory.
 
 ## Supported Imports
 
-V0.2.0 imports only formats Stata can load reliably:
+V0.2.1 indexes supported Stata-readable files and recognized data/document container formats.  It imports only formats Stata can load reliably:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -97,7 +97,7 @@ smartload/
 
 ## Version
 
-- Version: 0.2.0
+- Version: 0.2.1
 - Date: 2026-07-09
 - Author: Hao Ma
 - License: MIT

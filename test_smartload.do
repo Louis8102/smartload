@@ -117,5 +117,5 @@ di as txt "18. PPTX is detected"
 smartload slides.pptx, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as result "All runnable smartload V0.2.0 tests completed."
+di as result "All runnable smartload V0.2.1 tests completed."
 log close smartload_selftest

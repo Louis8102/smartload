@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.2.0 09jul2026}{...}
+{* *! version 0.2.1 09jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -32,7 +32,7 @@
 {title:Description}
 
 {pstd}
-{cmd:smartload} loads a data file by exact file name.  Version 0.2.0 uses a
+{cmd:smartload} loads a data file by exact file name.  Version 0.2.1 uses a
 pure Stata index stored in the user's PERSONAL ado directory.  It does not call
 {cmd:shell}, PowerShell, Everything, Windows Search, or external search tools.
 
