@@ -73,6 +73,8 @@ V0.2.0 imports only formats Stata can load reliably:
 - `.sas7bdat` via `import sas`
 - `.xpt` via `import sasxport`
 
+The index records all files it can see under indexed roots, including files in hidden folders.  Loading is implemented for the supported Stata-readable formats above, not only `.dta`.
+
 PDF, Word, PowerPoint, R, Python, GIS, database, and archive files are detected but not falsely imported.
 
 ## Files

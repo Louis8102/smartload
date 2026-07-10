@@ -92,6 +92,11 @@ In interactive Stata, type the number to import.  In batch mode, use
 {cmd:import delimited}; {cmd:.sav} and {cmd:.por} via {cmd:import spss};
 {cmd:.sas7bdat} via {cmd:import sas}; {cmd:.xpt} via {cmd:import sasxport}.
 
+{pstd}
+The index records all files it can see under indexed roots, including files in
+hidden folders.  Loading is implemented for the supported Stata-readable formats
+above, not only {cmd:.dta}.
+
 {title:Recognized But Not Imported}
 
 {pstd}

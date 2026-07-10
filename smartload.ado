@@ -81,7 +81,6 @@ program define smartload, rclass
         drop __rootfilter
     }
 
-    qui duplicates drop filepath, force
     qui count
     loc nmatch = r(N)
     if `nmatch' == 0 {
@@ -94,6 +93,9 @@ program define smartload, rclass
         }
         exit 601
     }
+    qui duplicates drop filepath, force
+    qui count
+    loc nmatch = r(N)
 
     if `nmatch' > 1 {
         di as err "Found multiple indexed files named `filename':"
@@ -359,24 +361,67 @@ program define smartload__scanroot, rclass
     }
 
     loc posth "`post'"
-    cap local files : dir `"`root'"' files "*"
-    if !_rc {
-        foreach f of local files {
-            mata: st_local("full", pathjoin(st_local("root"), st_local("f")))
-            mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
-            loc ext : subinstr loc ext "." "", all
-            post `posth' (`"`full'"') (`"`f'"') (`"`root'"') (`"`ext'"') ("`storage'")
-        }
-    }
+    loc nfiles 0
+    preserve
+    qui clear
+    qui set obs 1
+    qui gen str2045 dirname = `"`root'"'
+    qui gen byte done = 0
 
-    cap local dirs : dir `"`root'"' dirs "*"
-    if !_rc {
-        foreach sub of local dirs {
-            if `"`sub'"' == "." | `"`sub'"' == ".." continue
-            mata: st_local("child", pathjoin(st_local("root"), st_local("sub")))
-            smartload__scanroot, root(`"`child'"') post(`posth') storage(`storage')
+    qui count if done == 0
+    while r(N) > 0 {
+        sort done dirname
+        loc cur = dirname[1]
+        qui replace done = 1 in 1
+
+        loc cur_l = lower(`"`cur'"')
+        loc skip 0
+        foreach bad in "/windows" "/program files" "/program files (x86)" "/programdata" "/$recycle.bin" "/system volume information" "/recovery" {
+            if strpos(`"`cur_l'"', `"`bad'"') loc skip 1
         }
+        if `skip' {
+            qui count if done == 0
+            continue
+        }
+
+        cap local files : dir `"`cur'"' files "*"
+        if !_rc {
+            foreach f of local files {
+                mata: st_local("full", pathjoin(st_local("cur"), st_local("f")))
+                mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
+                loc ext : subinstr loc ext "." "", all
+                post `posth' (`"`full'"') (`"`f'"') (`"`cur'"') (`"`ext'"') ("`storage'")
+                loc ++nfiles
+            }
+        }
+
+        cap local dirs : dir `"`cur'"' dirs "*"
+        if !_rc {
+            foreach sub of local dirs {
+                if `"`sub'"' == "." | `"`sub'"' == ".." continue
+                mata: st_local("child", pathjoin(st_local("cur"), st_local("sub")))
+                loc child = subinstr(`"`child'"', char(92), "/", .)
+                mata: st_local("childex", strofreal(direxists(st_local("child"))))
+                if "`childex'" != "1" continue
+                loc child_l = lower(`"`child'"')
+                loc badchild 0
+                foreach bad in "/windows" "/program files" "/program files (x86)" "/programdata" "/$recycle.bin" "/system volume information" "/recovery" {
+                    if strpos(`"`child_l'"', `"`bad'"') loc badchild 1
+                }
+                if `badchild' continue
+                qui count if dirname == `"`child'"'
+                if r(N) == 0 {
+                    qui set obs `=_N + 1'
+                    qui replace dirname = `"`child'"' in L
+                    qui replace done = 0 in L
+                }
+            }
+        }
+
+        qui count if done == 0
     }
+    restore
+    return scalar nfiles = `nfiles'
 end
 
 program define smartload__detected, rclass
