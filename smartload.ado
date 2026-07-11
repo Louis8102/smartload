@@ -1,4 +1,4 @@
-*! smartload 0.3.4 10jul2026 Hao Ma
+*! smartload 0.3.6 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -27,6 +27,40 @@ program define smartload, rclass
     }
 
     loc filename `"`fname'"'
+    loc filename = strtrim(`"`filename'"')
+    loc stripped 1
+    while `stripped' {
+        loc stripped 0
+        loc wc : word count `filename'
+        if `wc' > 1 {
+            loc last : word `wc' of `filename'
+            loc lastlow = lower(`"`last'"')
+            if `"`lastlow'"' == "clear" & "`clear'" == "" {
+                loc clear "clear"
+                loc filename = substr(`"`filename'"', 1, strlen(`"`filename'"') - strlen(`"`last'"'))
+                loc filename = strtrim(`"`filename'"')
+                loc stripped 1
+            }
+            else if `"`lastlow'"' == "firstrow" & "`firstrow'" == "" {
+                loc firstrow "firstrow"
+                loc filename = substr(`"`filename'"', 1, strlen(`"`filename'"') - strlen(`"`last'"'))
+                loc filename = strtrim(`"`filename'"')
+                loc stripped 1
+            }
+            else if `"`lastlow'"' == "log" & "`log'" == "" {
+                loc log "log"
+                loc filename = substr(`"`filename'"', 1, strlen(`"`filename'"') - strlen(`"`last'"'))
+                loc filename = strtrim(`"`filename'"')
+                loc stripped 1
+            }
+            else if `"`lastlow'"' == "replace" & "`replace'" == "" {
+                loc replace "replace"
+                loc filename = substr(`"`filename'"', 1, strlen(`"`filename'"') - strlen(`"`last'"'))
+                loc filename = strtrim(`"`filename'"')
+                loc stripped 1
+            }
+        }
+    }
     local filename = subinstr(`"`filename'"', char(34), "", .)
     mata: st_local("filename", pathbasename(st_local("filename")))
     if `"`filename'"' == "" {
@@ -214,6 +248,11 @@ program define smartload, rclass
         else import parquet using "`loadpath'"
         loc importcmd "import parquet"
     }
+    else if "`ext'" == "dbf" {
+        if "`clear'" != "" import dbase using "`loadpath'", clear
+        else import dbase using "`loadpath'"
+        loc importcmd "import dbase"
+    }
     else {
         smartload__detected `"`filepath'"' "`filename'" "`ext'" "`lh'" "`logrequested'" "`ocr'"
         return local filepath `"`filepath'"'
@@ -244,6 +283,7 @@ program define smartload, rclass
     else if inlist("`ext'", "sav", "por") loc typename "SPSS data file"
     else if inlist("`ext'", "sas7bdat", "xpt") loc typename "SAS data file"
     else if "`ext'" == "parquet" loc typename "Parquet data file"
+    else if "`ext'" == "dbf" loc typename "dBASE/DBF database table"
     di as txt "Detected type: `typename'"
     di as txt "Command used: `importcmd'"
     di as txt "Storage location: `storage'"
@@ -659,7 +699,7 @@ program define smartload__scanroot, rclass
                 mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
                 loc ext : subinstr loc ext "." "", all
                 loc extok 0
-                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt parquet pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
+                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt parquet dbf pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
                     if "`ext'" == "`ok'" loc extok 1
                 }
                 if `extok' {

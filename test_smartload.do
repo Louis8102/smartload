@@ -29,9 +29,12 @@ cap export excel using "`base'\root1\sample.xlsx", firstrow(variables) replace
 local xlsx_rc = _rc
 cap export parquet using "`base'\root1\sample.parquet", replace
 local parquet_rc = _rc
+cap export dbase using "`base'\root1\sample.dbf", replace
+local dbf_rc = _rc
 
 copy "`base'\root1\sample.csv" "`base'\root2\sample.csv", replace
 copy "`base'\root1\sample.dta" "`base'\root2\sample.dta", replace
+copy "`base'\root1\sample.dta" "`base'\root1\Customer Delight Data_Master.dta", replace
 
 file open fh using "`base'\root1\report.pdf", write text replace
 file write fh "%PDF placeholder"
@@ -112,6 +115,16 @@ else {
     di as txt "Skipped parquet import test because export parquet failed on this Stata installation."
 }
 
+di as txt "9b. .dbf import succeeds if export dbase was available"
+if `dbf_rc' == 0 {
+    smartload sample.dbf, clear
+    assert r(N) == 5
+    assert "`r(importcmd)'" == "import dbase"
+}
+else {
+    di as txt "Skipped dbf import test because export dbase failed on this Stata installation."
+}
+
 di as txt "10. log output exists"
 confirm file smartload_log.txt
 
@@ -126,6 +139,16 @@ assert r(N) == 5
 di as txt "13. duplicate choice selects requested copy"
 smartload sample.dta, choice(2) clear
 assert r(N) == 5
+
+di as txt "14. file names with spaces import correctly"
+smartload Customer Delight Data_Master.dta, clear
+assert r(N) == 5
+assert "`r(filename)'" == "Customer Delight Data_Master.dta"
+
+di as txt "15. missing comma before clear is tolerated"
+smartload Customer Delight Data_Master.dta clear
+assert r(N) == 5
+assert "`r(filename)'" == "Customer Delight Data_Master.dta"
 
 di as txt "16. PDF is detected without pretending direct import"
 smartload report.pdf, clear
@@ -143,5 +166,5 @@ di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as result "All runnable smartload V0.3.4 tests completed."
+di as result "All runnable smartload V0.3.6 tests completed."
 log close smartload_selftest
