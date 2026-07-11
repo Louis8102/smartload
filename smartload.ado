@@ -1,4 +1,4 @@
-*! smartload 0.4.0 10jul2026 Hao Ma
+*! smartload 0.4.1 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -103,6 +103,14 @@ program define smartload, rclass
     preserve
     if `sysN' > 0 {
         qui use `"`sysmatches'"', clear
+        if !`isurl' & `"`roots'"' == "" {
+            smartload__cloudroots
+            if `"`r(roots)'"' != "" {
+                tempfile cloudmatches
+                smartload__quickfind, filename(`"`filename'"') roots(`"`r(roots)'"') maxdirs(`maxdirs') saving(`"`cloudmatches'"') storage(cloud) quiet
+                append using `"`cloudmatches'"'
+            }
+        }
     }
     else {
         cap confirm file `"`indexfile'"'
@@ -687,6 +695,27 @@ program define smartload__defaultroots, rclass
     return local roots `"`roots'"'
 end
 
+program define smartload__cloudroots, rclass
+    version 19.5
+    loc roots ""
+    loc home "C:/Users/`c(username)'"
+    foreach sub in OneDrive "OneDrive/Documents" Dropbox "Google Drive" "My Drive" Box "Box Sync" "Box Drive" "SharePoint" {
+        loc root `"`home'/`sub'"'
+        mata: st_local("direx", strofreal(direxists(st_local("root"))))
+        if "`direx'" == "1" loc roots `"`roots';`root'"'
+    }
+    forvalues i = 67/90 {
+        loc d = char(`i')
+        foreach sub in "Google Drive" "My Drive" Box Dropbox OneDrive SharePoint {
+            loc root "`d':/`sub'"
+            mata: st_local("direx", strofreal(direxists(st_local("root"))))
+            if "`direx'" == "1" loc roots `"`roots';`root'"'
+        }
+    }
+    if substr(`"`roots'"', 1, 1) == ";" loc roots = substr(`"`roots'"', 2, strlen(`"`roots'"') - 1)
+    return local roots `"`roots'"'
+end
+
 program define smartload__refresh, rclass
     version 19.5
     syntax , INDEXFILE(string) [ROOTS(string) DRIVES(string)]
@@ -835,7 +864,8 @@ end
 
 program define smartload__quickfind, rclass
     version 19.5
-    syntax , FILENAME(string) SAVING(string) [ROOTS(string) MAXDIRS(integer 2500)]
+    syntax , FILENAME(string) SAVING(string) [ROOTS(string) MAXDIRS(integer 2500) STORAGE(string) QUIET]
+    if `"`storage'"' == "" loc storage "fast"
     if `"`roots'"' == "" {
         smartload__defaultroots
         loc roots `"`r(roots)'"'
@@ -878,7 +908,7 @@ program define smartload__quickfind, rclass
             foreach f of local files {
                 if lower(`"`f'"') == `"`target_l'"' {
                     mata: st_local("full", pathjoin(st_local("root"), st_local("f")))
-                    post `posth' (`"`full'"') (`"`f'"') (`"`root'"') ("`target_ext'") ("fast")
+                    post `posth' (`"`full'"') (`"`f'"') (`"`root'"') ("`target_ext'") (`"`storage'"')
                 }
             }
         }
@@ -899,7 +929,7 @@ program define smartload__quickfind, rclass
             foreach f of local files {
                 if lower(`"`f'"') == `"`target_l'"' {
                     mata: st_local("full", pathjoin(st_local("cur"), st_local("f")))
-                    post `posth' (`"`full'"') (`"`f'"') (`"`cur'"') ("`target_ext'") ("fast")
+                    post `posth' (`"`full'"') (`"`f'"') (`"`cur'"') ("`target_ext'") (`"`storage'"')
                 }
             }
         }
@@ -939,7 +969,7 @@ program define smartload__quickfind, rclass
     loc n = r(N)
     restore
 
-    di as txt "Fast search checked `visited' folders."
+    if "`quiet'" == "" di as txt "Fast search checked `visited' folders."
     return local matchfile `"`saving'"'
     return scalar N = `n'
     return scalar visited = `visited'
