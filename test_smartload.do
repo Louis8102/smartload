@@ -252,6 +252,10 @@ assert "`r(importcmd)'" == "html table extraction"
 assert id[1] == 1
 assert score[2] == 20
 
+di as txt "18g. URL ending in slash is treated as HTML page"
+cap noi smartload "https://designsystem.digital.gov/components/table/", table(1) clear
+assert _rc != 198
+
 di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
 assert "`r(status)'" == "detected_not_imported"
@@ -273,6 +277,6 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.6.1 tests completed."
+di as result "All runnable smartload V0.6.2 tests completed."
 log close smartload_selftest
 

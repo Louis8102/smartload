@@ -1,4 +1,4 @@
-*! smartload 0.6.1 11jul2026 Hao Ma
+*! smartload 0.6.2 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -74,6 +74,7 @@ program define smartload, rclass
         loc hpos = strpos(`"`urlclean'"', "#")
         if `hpos' > 0 loc urlclean = substr(`"`urlclean'"', 1, `hpos' - 1)
         mata: st_local("filename", pathbasename(st_local("urlclean")))
+        if `"`filename'"' == "" loc filename "index.html"
     }
     if `"`filename'"' == "" {
         di as err "Please specify a file name, or run {cmd:smartload, setup}."
@@ -419,6 +420,7 @@ program define smartload__urlmatch, rclass
     if `hpos' > 0 loc clean = substr(`"`clean'"', 1, `hpos' - 1)
 
     mata: st_local("base", pathbasename(st_local("clean")))
+    if `"`base'"' == "" loc base "index.html"
     mata: st_local("ext", strlower(pathsuffix(st_local("clean"))))
     loc ext : subinstr loc ext "." "", all
     if `"`ext'"' == "" loc ext "html"
