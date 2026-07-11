@@ -1,9 +1,9 @@
-*! smartload 0.4.1 10jul2026 Hao Ma
+*! smartload 0.5.0 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
         DRIVES(string) CHOICE(integer -1) CLEAR SHEET(string) FIRSTROW ///
-        ENCODING(string) OCR LOG REPLACE MAXDIRS(integer 2500)]
+        ENCODING(string) OCR LOG REPLACE MAXDIRS(integer 2500) TABLE(integer 1)]
 
     smartload__indexpath
     loc indexfile `"`r(indexfile)'"'
@@ -316,6 +316,19 @@ program define smartload, rclass
         if `dctrc' exit `dctrc'
         loc importcmd "infix using"
     }
+    else if inlist("`ext'", "docx", "pptx") {
+        if "`storage'" == "url" {
+            di as err "URL .`ext' table extraction is not enabled."
+            di as txt "Download the Office file locally, then run smartload on the local .`ext' file."
+            return local filepath `"`filepath'"'
+            return local filename `"`filename'"'
+            return local extension "`ext'"
+            return local status "detected_not_imported"
+            exit 459
+        }
+        smartload__office_table, filepath(`"`loadpath'"') ext(`"`ext'"') table(`table') `clear' `firstrow'
+        loc importcmd "office table extraction"
+    }
     else {
         smartload__detected `"`filepath'"' "`filename'" "`ext'" "`lh'" "`logrequested'" "`ocr'"
         return local filepath `"`filepath'"'
@@ -348,6 +361,8 @@ program define smartload, rclass
     else if "`ext'" == "parquet" loc typename "Parquet data file"
     else if "`ext'" == "dbf" loc typename "dBASE/DBF database table"
     else if "`ext'" == "dct" loc typename "Fixed-format dictionary"
+    else if "`ext'" == "docx" loc typename "Word table"
+    else if "`ext'" == "pptx" loc typename "PowerPoint table"
     di as txt "Detected type: `typename'"
     di as txt "Command used: `importcmd'"
     di as txt "Storage location: `storage'"
@@ -404,6 +419,56 @@ program define smartload__urlmatch, rclass
     if `"`u'"' != `"`url'"' di as txt "GitHub blob URL converted to raw URL."
     return scalar N = 1
     return local url `"`u'"'
+end
+
+program define smartload__office_table, rclass
+    version 19.5
+    syntax , FILEPATH(string) EXT(string) TABLE(integer) [CLEAR FIRSTROW]
+
+    tempfile csv marker
+    loc workdir `"`marker'_office"'
+    cap mkdir `"`workdir'"'
+    loc oldpwd `"`c(pwd)'"'
+    qui cd `"`workdir'"'
+    cap noi unzipfile `"`filepath'"', replace
+    loc unzip_rc = _rc
+    qui cd `"`oldpwd'"'
+    if `unzip_rc' {
+        di as err "Could not unzip .`ext' Office container."
+        exit `unzip_rc'
+    }
+
+    loc xmlfiles ""
+    if "`ext'" == "docx" {
+        mata: st_local("docxml", pathjoin(pathjoin(st_local("workdir"), "word"), "document.xml"))
+        cap confirm file `"`docxml'"'
+        if _rc {
+            di as err "No Word document.xml was found inside the DOCX file."
+            exit 498
+        }
+        loc xmlfiles `"`docxml'"'
+    }
+    else if "`ext'" == "pptx" {
+        mata: st_local("slidesdir", pathjoin(pathjoin(st_local("workdir"), "ppt"), "slides"))
+        cap local slides : dir `"`slidesdir'"' files "slide*.xml"
+        if _rc | `"`slides'"' == "" {
+            di as err "No PowerPoint slide XML files were found inside the PPTX file."
+            exit 498
+        }
+        foreach s of local slides {
+            mata: st_local("slidepath", pathjoin(st_local("slidesdir"), st_local("s")))
+            loc xmlfiles `"`xmlfiles';`slidepath'"'
+        }
+        if substr(`"`xmlfiles'"', 1, 1) == ";" loc xmlfiles = substr(`"`xmlfiles'"', 2, strlen(`"`xmlfiles'"') - 1)
+    }
+
+    mata: smartload_office_table_to_csv(st_local("xmlfiles"), st_local("ext"), strtoreal(st_local("table")), st_local("csv"))
+    loc opts ""
+    if "`firstrow'" != "" loc opts "`opts' varnames(1)"
+    else loc opts "`opts' varnames(nonames)"
+    if "`clear'" != "" loc opts "`opts' clear"
+    import delimited using `"`csv'"', `opts'
+    return local importcmd "office table extraction"
 end
 
 program define smartload__everything, rclass
@@ -979,8 +1044,8 @@ program define smartload__detected, rclass
     args filepath filename ext lh logrequested ocr
     loc kind "unsupported"
     if inlist("`ext'", "pdf") loc kind "PDF/document-table"
-    else if inlist("`ext'", "docx", "doc") loc kind "Word/document-table"
-    else if inlist("`ext'", "pptx", "ppt") loc kind "PowerPoint/presentation-table"
+    else if inlist("`ext'", "doc") loc kind "Word/document-table"
+    else if inlist("`ext'", "ppt") loc kind "PowerPoint/presentation-table"
     else if inlist("`ext'", "rds", "rda", "rdata", "r") loc kind "R"
     else if inlist("`ext'", "zip", "gz", "7z", "tar") loc kind "archive"
     else if inlist("`ext'", "sqlite", "db", "duckdb", "accdb", "mdb", "sql") loc kind "database"
@@ -993,9 +1058,9 @@ program define smartload__detected, rclass
         di as txt "Convert in R to .dta, .parquet, or .csv, then run smartload again."
         di as txt `"Examples: haven::write_dta(df, "data.dta"); arrow::write_parquet(df, "data.parquet")."'
     }
-    else if inlist("`ext'", "docx", "doc", "pptx", "ppt", "pdf") {
+    else if inlist("`ext'", "doc", "ppt", "pdf") {
         di as err "Document table extraction is not enabled in this version."
-        di as txt "DOCX, PPTX, and PDF may contain tables, but they are document containers, not reliable rectangular data files."
+        di as txt "Legacy DOC/PPT and PDF may contain tables, but they are not reliable rectangular data files."
     }
     else {
         di as err "This file type is detected but not safely importable by smartload in this version."
@@ -1004,4 +1069,162 @@ program define smartload__detected, rclass
         file write `lh' "Result: detected_not_imported" _n _n
         file close `lh'
     }
+end
+
+mata:
+string scalar smartload_readfile(string scalar fn)
+{
+    real scalar fh
+    string scalar line, out
+    out = ""
+    fh = fopen(fn, "r")
+    while ((line = fget(fh)) != J(0,0,"")) {
+        out = out + line
+    }
+    fclose(fh)
+    return(out)
+}
+
+real scalar smartload_posfrom(string scalar s, string scalar needle, real scalar start)
+{
+    real scalar p
+    if (start < 1) start = 1
+    if (start > strlen(s)) return(0)
+    p = strpos(substr(s, start, .), needle)
+    if (p == 0) return(0)
+    return(start + p - 1)
+}
+
+string scalar smartload_xml_unescape(string scalar s)
+{
+    s = subinstr(s, "&amp;", "&", .)
+    s = subinstr(s, "&lt;", "<", .)
+    s = subinstr(s, "&gt;", ">", .)
+    s = subinstr(s, "&quot;", `"""', .)
+    s = subinstr(s, "&apos;", "'", .)
+    return(strtrim(s))
+}
+
+string scalar smartload_cell_text(string scalar cell, string scalar prefix)
+{
+    real scalar p, gt, q
+    string scalar open, close, out
+    open = "<" + prefix + ":t"
+    close = "</" + prefix + ":t>"
+    out = ""
+    p = 1
+    while ((p = smartload_posfrom(cell, open, p)) > 0) {
+        gt = smartload_posfrom(cell, ">", p)
+        if (gt == 0) break
+        q = smartload_posfrom(cell, close, gt + 1)
+        if (q == 0) break
+        if (out != "") out = out + " "
+        out = out + substr(cell, gt + 1, q - gt - 1)
+        p = q + strlen(close)
+    }
+    return(smartload_xml_unescape(out))
+}
+
+string rowvector smartload_row_cells(string scalar row, string scalar prefix)
+{
+    real scalar p, gt, q
+    string scalar open, close, cell
+    string rowvector cells
+    open = "<" + prefix + ":tc"
+    close = "</" + prefix + ":tc>"
+    cells = J(1, 0, "")
+    p = 1
+    while ((p = smartload_posfrom(row, open, p)) > 0) {
+        gt = smartload_posfrom(row, ">", p)
+        if (gt == 0) break
+        q = smartload_posfrom(row, close, gt + 1)
+        if (q == 0) break
+        cell = substr(row, gt + 1, q - gt - 1)
+        cells = cells, smartload_cell_text(cell, prefix)
+        p = q + strlen(close)
+    }
+    return(cells)
+}
+
+string scalar smartload_csv_quote(string scalar s)
+{
+    s = subinstr(s, `"""', `""""', .)
+    return(`"""' + s + `"""')
+}
+
+void smartload_write_csv(string matrix rows, string scalar csvfile)
+{
+    real scalar fh, i, j
+    string scalar line
+    fh = fopen(csvfile, "w")
+    for (i=1; i<=rows(rows); i++) {
+        line = ""
+        for (j=1; j<=cols(rows); j++) {
+            if (j > 1) line = line + ","
+            line = line + smartload_csv_quote(rows[i,j])
+        }
+        fput(fh, line)
+    }
+    fclose(fh)
+}
+
+void smartload_office_table_to_csv(string scalar xmlfiles, string scalar ext, real scalar wanted, string scalar csvfile)
+{
+    string rowvector files, cells
+    string scalar xml, prefix, tblopen, tblclose, rowopen, rowclose, tbl, row
+    real scalar f, p, gt, q, rp, rgt, rq, count, maxc, nr, i
+    string matrix rows, out
+
+    files = tokens(xmlfiles, ";")
+    prefix = (ext == "docx" ? "w" : "a")
+    tblopen = "<" + prefix + ":tbl"
+    tblclose = "</" + prefix + ":tbl>"
+    rowopen = "<" + prefix + ":tr"
+    rowclose = "</" + prefix + ":tr>"
+    count = 0
+    rows = J(0, 0, "")
+    maxc = 0
+
+    for (f=1; f<=cols(files); f++) {
+        xml = smartload_readfile(files[f])
+        p = 1
+        while ((p = smartload_posfrom(xml, tblopen, p)) > 0) {
+            gt = smartload_posfrom(xml, ">", p)
+            if (gt == 0) break
+            q = smartload_posfrom(xml, tblclose, gt + 1)
+            if (q == 0) break
+            count++
+            if (count == wanted) {
+                tbl = substr(xml, gt + 1, q - gt - 1)
+                rp = 1
+                while ((rp = smartload_posfrom(tbl, rowopen, rp)) > 0) {
+                    rgt = smartload_posfrom(tbl, ">", rp)
+                    if (rgt == 0) break
+                    rq = smartload_posfrom(tbl, rowclose, rgt + 1)
+                    if (rq == 0) break
+                    row = substr(tbl, rgt + 1, rq - rgt - 1)
+                    cells = smartload_row_cells(row, prefix)
+                    if (cols(cells) > maxc) maxc = cols(cells)
+                    if (cols(rows) == 0) rows = cells
+                    else {
+                        if (cols(cells) < cols(rows)) cells = cells, J(1, cols(rows)-cols(cells), "")
+                        if (cols(cells) > cols(rows)) rows = rows, J(rows(rows), cols(cells)-cols(rows), "")
+                        rows = rows \ cells
+                    }
+                    rp = rq + strlen(rowclose)
+                }
+                if (rows(rows) == 0 | maxc == 0) {
+                    errprintf("Selected Office table has no readable text cells.\n")
+                    _error(498)
+                }
+                if (cols(rows) < maxc) rows = rows, J(rows(rows), maxc-cols(rows), "")
+                smartload_write_csv(rows, csvfile)
+                return
+            }
+            p = q + strlen(tblclose)
+        }
+    }
+    errprintf("Requested Office table was not found. Tables found: %g\n", count)
+    _error(498)
+}
 end

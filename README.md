@@ -1,4 +1,4 @@
-# smartload V0.4.1 Notes
+# smartload V0.5.0 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
 
@@ -12,17 +12,19 @@ smartload workbook.xlsx, firstrow clear
 smartload panel.parquet, clear
 smartload table.dbf, clear
 smartload fixed_dictionary.dct, clear
+smartload report.docx, table(1) firstrow clear
+smartload slides.pptx, table(1) firstrow clear
 smartload "https://www.stata-press.com/data/r18/auto.dta", clear
 smartload "https://raw.githubusercontent.com/user/repo/main/data.csv", clear
 ```
 
-The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.4.1 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
+The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.5.0 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
 
 For local file names, `smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan. For `http://` or `https://` URLs, `smartload` skips local search and imports directly from the URL.
 
 ## Installation
 
-V0.4.1 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
+V0.5.0 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -86,7 +88,7 @@ When you run:
 smartload filename.ext, clear
 ```
 
-V0.4.1 uses this order for local file names:
+V0.5.0 uses this order for local file names:
 
 1. On Windows, use Everything's command-line interface `es.exe` if available.
 2. Search `smartload_index.dta`, if it exists.
@@ -101,7 +103,7 @@ smartload, installes
 
 The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
 
-V0.4.1 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+V0.5.0 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
 
 ```stata
 smartload, refresh drives(all)
@@ -122,7 +124,7 @@ C:\Users\Hao Ma\Dropbox\...
 
 For best speed, mark important cloud data folders as "Always keep on this device" or the equivalent setting in the cloud client, and let Everything index those local cloud folders. If a file is online-only, `smartload` may find the placeholder path but Stata import can still pause while the cloud client downloads the file.
 
-If Everything finds a same-named file on a normal drive, V0.4.1 still performs a bounded check of common local cloud roots such as `C:\Users\...\Box`, `OneDrive`, `Dropbox`, `Google Drive`, and `SharePoint`. This prevents a local Box/OneDrive copy from being silently missed just because Everything returned another copy first.
+If Everything finds a same-named file on a normal drive, V0.5.0 still performs a bounded check of common local cloud roots such as `C:\Users\...\Box`, `OneDrive`, `Dropbox`, `Google Drive`, and `SharePoint`. This prevents a local Box/OneDrive copy from being silently missed just because Everything returned another copy first.
 
 Authenticated cloud accounts are not the same thing as local indexing. Even after a user signs in to Google Drive, OneDrive, Dropbox, Box, or SharePoint in a browser, `smartload` cannot promise instant cloud-wide search unless those files are exposed locally or a provider-specific API workflow is added. Pure browser-only cloud files without a local path are outside the instant local-search guarantee.
 
@@ -168,7 +170,7 @@ smartload Indicator.dta, choice(2) clear
 
 ## Supported Native Imports
 
-V0.4.1 imports Stata-readable data files through Stata's native commands:
+V0.5.0 imports Stata-readable data files through Stata's native commands:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -180,8 +182,12 @@ V0.4.1 imports Stata-readable data files through Stata's native commands:
 - `.parquet` via `import parquet`
 - `.dbf` via `import dbase`
 - `.dct` fixed-format dictionaries via `infix using`
+- `.docx` true Word tables via experimental Office table extraction
+- `.pptx` true PowerPoint tables via experimental Office table extraction
 
 The same extension-based dispatch is used for direct URLs when Stata's native command can read that URL.
+
+For `.docx` and `.pptx`, `smartload` extracts real Office table XML only. It does not OCR screenshots, pictures, scanned tables, legacy `.doc`/`.ppt`, merged-cell layouts, or arbitrary page text. Use `table(#)` to select a table and `firstrow` when the first table row contains variable names.
 
 The Stata menu also includes JDBC, ODBC, FRED, and Haver entries. These are connection/data-source workflows rather than ordinary files found by file name on disk, so they are outside the `smartload filename.ext` workflow.
 
@@ -189,16 +195,16 @@ For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable lab
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.4.1:
+These files are indexed/detected but not automatically imported in V0.5.0:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
-- Document containers: `.docx`, `.doc`, `.pptx`, `.ppt`, `.pdf`
+- Document containers not supported as rectangular data: `.doc`, `.ppt`, `.pdf`
 - Python/data-science containers other than native Parquet: `.feather`, `.pkl`, `.pickle`, `.arrow`, `.h5`, `.hdf5`, `.json`, `.jsonl`
 - GIS, database, and archive files
 
 R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
 
-DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.4.1 detects them but does not claim accurate table extraction.
+DOC/PPT/PDF files may contain visual tables, but they are document containers. V0.5.0 does not claim accurate table extraction for those formats. DOCX/PPTX support is limited to true Office table objects.
 
 ## Files
 
@@ -220,7 +226,7 @@ smartload/
 
 ## Version
 
-- Version: 0.4.1
+- Version: 0.5.0
 - Date: 2026-07-10
 - Author: Hao Ma
 - License: MIT

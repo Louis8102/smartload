@@ -40,13 +40,26 @@ file open fh using "`base'\root1\report.pdf", write text replace
 file write fh "%PDF placeholder"
 file close fh
 
-file open fh using "`base'\root1\report.docx", write text replace
-file write fh "placeholder"
+cap mkdir "`base'\docxbuild"
+cap mkdir "`base'\docxbuild\word"
+file open fh using "`base'\docxbuild\word\document.xml", write text replace
+file write fh `"<w:document><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>id</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>score</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>10</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>2</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>20</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"'
 file close fh
+local oldpwd "`c(pwd)'"
+qui cd "`base'\docxbuild"
+zipfile "word", saving("`base'\root1\report.docx", replace)
+qui cd "`oldpwd'"
 
-file open fh using "`base'\root1\slides.pptx", write text replace
-file write fh "placeholder"
+cap mkdir "`base'\pptxbuild"
+cap mkdir "`base'\pptxbuild\ppt"
+cap mkdir "`base'\pptxbuild\ppt\slides"
+file open fh using "`base'\pptxbuild\ppt\slides\slide1.xml", write text replace
+file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>id</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>score</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>1</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>100</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>2</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>200</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
 file close fh
+local oldpwd "`c(pwd)'"
+qui cd "`base'\pptxbuild"
+zipfile "ppt", saving("`base'\root1\slides.pptx", replace)
+qui cd "`oldpwd'"
 
 file open fh using "`base'\root1\data.rds", write text replace
 file write fh "placeholder for R object"
@@ -173,13 +186,17 @@ di as txt "16. PDF is detected without pretending direct import"
 smartload report.pdf, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as txt "17. DOCX is detected"
-smartload report.docx, clear
-assert "`r(status)'" == "detected_not_imported"
+di as txt "17. DOCX true Office table imports"
+smartload report.docx, table(1) firstrow clear
+assert r(N) == 2
+assert r(k) == 2
+assert "`r(importcmd)'" == "office table extraction"
 
-di as txt "18. PPTX is detected"
-smartload slides.pptx, clear
-assert "`r(status)'" == "detected_not_imported"
+di as txt "18. PPTX true Office table imports"
+smartload slides.pptx, table(1) firstrow clear
+assert r(N) == 2
+assert r(k) == 2
+assert "`r(importcmd)'" == "office table extraction"
 
 di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
@@ -202,5 +219,5 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.4.1 tests completed."
+di as result "All runnable smartload V0.5.0 tests completed."
 log close smartload_selftest
