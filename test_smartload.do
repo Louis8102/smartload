@@ -56,6 +56,9 @@ cap mkdir "`base'\pptxbuild\ppt\slides"
 file open fh using "`base'\pptxbuild\ppt\slides\slide1.xml", write text replace
 file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:rPr lang="en-US"/><a:t>id</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>score</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>1</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>100</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>2</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>200</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
 file close fh
+file open fh using "`base'\pptxbuild\ppt\slides\slide2.xml", write text replace
+file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>animal</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>count</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>cat</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>3</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
+file close fh
 local oldpwd "`c(pwd)'"
 qui cd "`base'\pptxbuild"
 zipfile "ppt", saving("`base'\root1\slides.pptx", replace)
@@ -199,8 +202,18 @@ smartload slides.pptx, table(1) firstrow clear
 assert r(N) == 2
 assert r(k) == 2
 assert "`r(importcmd)'" == "office table extraction"
+assert r(ntables) == 2
 assert id[1] == 1
 assert score[2] == 200
+
+di as txt "18b. PPTX second table can be selected"
+smartload slides.pptx, table(2) firstrow clear
+assert r(N) == 1
+assert r(k) == 2
+assert r(table) == 2
+assert r(ntables) == 2
+assert animal[1] == "cat"
+assert count[1] == 3
 
 di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
@@ -223,5 +236,6 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.5.1 tests completed."
+di as result "All runnable smartload V0.5.2 tests completed."
 log close smartload_selftest
+

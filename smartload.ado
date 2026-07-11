@@ -1,4 +1,4 @@
-*! smartload 0.5.1 11jul2026 Hao Ma
+*! smartload 0.5.2 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -327,6 +327,8 @@ program define smartload, rclass
             exit 459
         }
         smartload__office_table, filepath(`"`loadpath'"') ext(`"`ext'"') table(`table') `clear' `firstrow'
+        loc office_table = r(table)
+        loc office_ntables = r(ntables)
         loc importcmd "office table extraction"
     }
     else {
@@ -344,6 +346,10 @@ program define smartload, rclass
     return local importcmd "`importcmd'"
     return local storage "`storage'"
     return local indexfile `"`indexfile'"'
+    if inlist("`ext'", "docx", "pptx") {
+        return scalar table = `office_table'
+        return scalar ntables = `office_ntables'
+    }
     qui ds
     loc k : word count `r(varlist)'
     loc N = _N
@@ -430,7 +436,7 @@ program define smartload__office_table, rclass
     cap mkdir `"`workdir'"'
     loc oldpwd `"`c(pwd)'"'
     qui cd `"`workdir'"'
-    cap noi unzipfile `"`filepath'"', replace
+    cap qui unzipfile `"`filepath'"', replace
     loc unzip_rc = _rc
     qui cd `"`oldpwd'"'
     if `unzip_rc' {
@@ -1207,13 +1213,35 @@ void smartload_write_csv(string matrix rows, string scalar csvfile)
     fclose(fh)
 }
 
+string rowvector smartload_semicolon_split(string scalar s)
+{
+    string rowvector out
+    string scalar part
+    real scalar p
+
+    out = J(1, 0, "")
+    while (strlen(s) > 0) {
+        p = strpos(s, ";")
+        if (p == 0) {
+            part = strtrim(s)
+            s = ""
+        }
+        else {
+            part = strtrim(substr(s, 1, p - 1))
+            s = substr(s, p + 1, .)
+        }
+        if (part != "") out = out, part
+    }
+    return(out)
+}
+
 real scalar smartload_office_table_count(string scalar xmlfiles, string scalar ext)
 {
     string rowvector files
     string scalar xml, prefix, tblopen, tblclose
     real scalar f, p, gt, q, count
 
-    files = tokens(xmlfiles, ";")
+    files = smartload_semicolon_split(xmlfiles)
     prefix = (ext == "docx" ? "w" : "a")
     tblopen = "<" + prefix + ":tbl"
     tblclose = "</" + prefix + ":tbl>"
@@ -1240,7 +1268,7 @@ string scalar smartload_office_table_preview(string scalar xmlfiles, string scal
     string scalar xml, prefix, tblopen, tblclose, rowopen, rowclose, tbl, row, preview
     real scalar f, p, gt, q, rp, rgt, rq, count, nrows, maxc, j
 
-    files = tokens(xmlfiles, ";")
+    files = smartload_semicolon_split(xmlfiles)
     prefix = (ext == "docx" ? "w" : "a")
     tblopen = "<" + prefix + ":tbl"
     tblclose = "</" + prefix + ":tbl>"
@@ -1298,7 +1326,7 @@ void smartload_office_table_to_csv(string scalar xmlfiles, string scalar ext, re
     real scalar f, p, gt, q, rp, rgt, rq, count, maxc, nr, i
     string matrix rows, out
 
-    files = tokens(xmlfiles, ";")
+    files = smartload_semicolon_split(xmlfiles)
     prefix = (ext == "docx" ? "w" : "a")
     tblopen = "<" + prefix + ":tbl"
     tblclose = "</" + prefix + ":tbl>"
