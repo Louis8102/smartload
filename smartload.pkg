@@ -1,10 +1,12 @@
 v 3
 d smartload: find a named data file and load it into Stata
-d Version: 0.3.7
+d Version: 0.4.0
 d
 d smartload loads data files by file name without requiring the folder path.
 d It imports DTA, Excel, CSV/text, SPSS, SAS, XPT/V8XPT, Parquet, DBF, and DCT dictionaries using native Stata commands.
 d On Windows, it can use Everything's es.exe command-line interface when available.
+d It imports direct http/https data-file URLs and converts common GitHub blob URLs to raw URLs.
+d It supports locally synced cloud-drive folders such as OneDrive, Google Drive, Dropbox, Box, and SharePoint Sync.
 d Use smartload, installes to install es.exe into the user's PERSONAL ado folder.
 d It detects but does not automatically import R files or DOCX/PPT/PDF document tables.
 d Use smartload, setup for a guided index setup.

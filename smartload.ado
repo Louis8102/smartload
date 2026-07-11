@@ -1,4 +1,4 @@
-*! smartload 0.3.7 10jul2026 Hao Ma
+*! smartload 0.4.0 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -62,7 +62,19 @@ program define smartload, rclass
         }
     }
     local filename = subinstr(`"`filename'"', char(34), "", .)
-    mata: st_local("filename", pathbasename(st_local("filename")))
+    loc source `"`filename'"'
+    loc isurl = inlist(substr(lower(`"`source'"'), 1, 7), "http://") | inlist(substr(lower(`"`source'"'), 1, 8), "https://")
+    if !`isurl' {
+        mata: st_local("filename", pathbasename(st_local("filename")))
+    }
+    else {
+        loc urlclean `"`source'"'
+        loc qpos = strpos(`"`urlclean'"', "?")
+        if `qpos' > 0 loc urlclean = substr(`"`urlclean'"', 1, `qpos' - 1)
+        loc hpos = strpos(`"`urlclean'"', "#")
+        if `hpos' > 0 loc urlclean = substr(`"`urlclean'"', 1, `hpos' - 1)
+        mata: st_local("filename", pathbasename(st_local("urlclean")))
+    }
     if `"`filename'"' == "" {
         di as err "Please specify a file name, or run {cmd:smartload, setup}."
         exit 198
@@ -79,8 +91,14 @@ program define smartload, rclass
     }
 
     tempfile sysmatches
-    smartload__everything, filename(`"`filename'"') saving(`"`sysmatches'"')
-    loc sysN = r(N)
+    if `isurl' {
+        smartload__urlmatch, url(`"`source'"') saving(`"`sysmatches'"')
+        loc sysN = r(N)
+    }
+    else {
+        smartload__everything, filename(`"`filename'"') saving(`"`sysmatches'"')
+        loc sysN = r(N)
+    }
 
     preserve
     if `sysN' > 0 {
@@ -174,7 +192,12 @@ program define smartload, rclass
     restore
 
     loc loadpath = subinstr(`"`filepath'"', char(92), "/", .)
-    mata: st_local("ext", strlower(pathsuffix(st_local("filepath"))))
+    loc extpath `"`filepath'"'
+    loc qpos = strpos(`"`extpath'"', "?")
+    if `qpos' > 0 loc extpath = substr(`"`extpath'"', 1, `qpos' - 1)
+    loc hpos = strpos(`"`extpath'"', "#")
+    if `hpos' > 0 loc extpath = substr(`"`extpath'"', 1, `hpos' - 1)
+    mata: st_local("ext", strlower(pathsuffix(st_local("extpath"))))
     loc ext : subinstr loc ext "." "", all
     loc importcmd ""
 
@@ -259,6 +282,15 @@ program define smartload, rclass
         loc importcmd "import dbase"
     }
     else if "`ext'" == "dct" {
+        if "`storage'" == "url" {
+            di as err "URL .dct files are not safely importable because the dictionary usually references a companion raw data file."
+            di as txt "Download the .dct and its raw data file to the same local folder, then run smartload on the local .dct."
+            return local filepath `"`filepath'"'
+            return local filename `"`filename'"'
+            return local extension "`ext'"
+            return local status "detected_not_imported"
+            exit 459
+        }
         if "`clear'" != "" clear
         loc dctpath = subinstr(`"`loadpath'"', char(92), "/", .)
         mata: st_local("dctbase", pathbasename(st_local("dctpath")))
@@ -321,6 +353,49 @@ program define smartload, rclass
         file write `lh' "Variables: `k'" _n _n
         file close `lh'
     }
+end
+
+program define smartload__urlmatch, rclass
+    version 19.5
+    syntax , URL(string) SAVING(string)
+
+    loc u `"`url'"'
+    loc ul = lower(`"`u'"')
+    if strpos(`"`ul'"', "https://github.com/") == 1 & strpos(`"`ul'"', "/blob/") > 0 {
+        loc u = subinstr(`"`u'"', "https://github.com/", "https://raw.githubusercontent.com/", 1)
+        loc u = subinstr(`"`u'"', "/blob/", "/", 1)
+    }
+    if strpos(`"`ul'"', "http://github.com/") == 1 & strpos(`"`ul'"', "/blob/") > 0 {
+        loc u = subinstr(`"`u'"', "http://github.com/", "https://raw.githubusercontent.com/", 1)
+        loc u = subinstr(`"`u'"', "/blob/", "/", 1)
+    }
+
+    loc clean `"`u'"'
+    loc qpos = strpos(`"`clean'"', "?")
+    if `qpos' > 0 loc clean = substr(`"`clean'"', 1, `qpos' - 1)
+    loc hpos = strpos(`"`clean'"', "#")
+    if `hpos' > 0 loc clean = substr(`"`clean'"', 1, `hpos' - 1)
+
+    mata: st_local("base", pathbasename(st_local("clean")))
+    mata: st_local("ext", strlower(pathsuffix(st_local("clean"))))
+    loc ext : subinstr loc ext "." "", all
+
+    loc slash = 0
+    forvalues i = 1/`=strlen(`"`clean'"')' {
+        if substr(`"`clean'"', `i', 1) == "/" loc slash = `i'
+    }
+    loc dir = ""
+    if `slash' > 1 loc dir = substr(`"`clean'"', 1, `slash' - 1)
+
+    tempname posth
+    postfile `posth' str2045 filepath str255 filename str2045 dirname str32 ext str20 storage using `"`saving'"', replace
+    post `posth' (`"`u'"') (`"`base'"') (`"`dir'"') (`"`ext'"') ("url")
+    postclose `posth'
+
+    di as txt "Detected URL input; smartload will import directly from the URL."
+    if `"`u'"' != `"`url'"' di as txt "GitHub blob URL converted to raw URL."
+    return scalar N = 1
+    return local url `"`u'"'
 end
 
 program define smartload__everything, rclass

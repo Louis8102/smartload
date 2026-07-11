@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.3.7 10jul2026}{...}
+{* *! version 0.4.0 10jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -38,7 +38,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.3.7 first uses Everything's
+to remember the folder path.  Version 0.4.0 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -51,9 +51,10 @@ Daily use:
 {phang2}{cmd:. smartload panel.parquet, clear}{p_end}
 {phang2}{cmd:. smartload table.dbf, clear}{p_end}
 {phang2}{cmd:. smartload fixed_dictionary.dct, clear}{p_end}
+{phang2}{cmd:. smartload "https://www.stata-press.com/data/r18/auto.dta", clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.3.7 also
+The standard Stata syntax uses a comma before options.  Version 0.4.0 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -62,6 +63,21 @@ option, not as part of the file name.
 Recommended first setup:
 
 {phang2}{cmd:. smartload, setup}{p_end}
+
+{pstd}
+If the input starts with {cmd:http://} or {cmd:https://}, {cmd:smartload}
+treats it as a direct data-file URL and skips local search.  Common GitHub
+{cmd:blob} URLs are converted to raw GitHub URLs automatically.
+
+{pstd}
+Cloud-drive files are supported when they are locally synced or mounted as
+ordinary folders/drives, such as OneDrive, Dropbox, Google Drive for desktop,
+Box Drive, or SharePoint Sync.  For best speed, mark important cloud data
+folders as "Always keep on this device" and let Everything index those local
+folders.  Signed-in browser cloud accounts are not the same thing as local
+indexing; provider API search can be subject to network latency, paging, and
+rate limits.  Pure browser-only cloud files without a local path are outside
+the instant local-search guarantee.
 
 {title:Options}
 
@@ -129,6 +145,12 @@ workflows rather than ordinary disk files found by file name; they are outside
 the {cmd:smartload filename.ext} workflow.
 
 {pstd}
+The same extension-based dispatch is used for direct URLs when Stata's native
+command can read that URL.  URL {cmd:.dct} files are not imported because a
+dictionary normally references a companion raw data file; download both files
+to the same local folder first.
+
+{pstd}
 For SPSS files, {cmd:smartload} uses Stata's native {cmd:import spss} so
 variable labels and value labels are preserved whenever Stata can preserve
 them.
@@ -142,7 +164,7 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.3.7 detects them but does not claim accurate table extraction.
+Version 0.4.0 detects them but does not claim accurate table extraction.
 
 {title:Duplicate File Names}
 
@@ -169,8 +191,10 @@ In interactive Stata, type the number to import.  In batch mode, use
 {phang2}{cmd:. smartload lake.parquet, clear}{p_end}
 {phang2}{cmd:. smartload table.dbf, clear}{p_end}
 {phang2}{cmd:. smartload fixed_dictionary.dct, clear}{p_end}
+{phang2}{cmd:. smartload "https://github.com/user/repo/blob/main/data.csv", clear}{p_end}
 {phang2}{cmd:. smartload workbook.xlsx, sheet("Sheet1") firstrow clear}{p_end}
 {phang2}{cmd:. smartload, refresh roots("F:\Project;G:\Data")}{p_end}
+{phang2}{cmd:. smartload, refresh roots("C:\Users\Hao Ma\OneDrive;G:\My Drive")}{p_end}
 {phang2}{cmd:. smartload, refresh drives(all)}   // slow{p_end}
 
 {title:Returned Results}

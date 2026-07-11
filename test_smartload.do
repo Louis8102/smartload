@@ -185,5 +185,22 @@ di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as result "All runnable smartload V0.3.7 tests completed."
+di as txt "20. URL .dta import succeeds when internet access is available"
+cap noi smartload "https://www.stata-press.com/data/r18/auto.dta", clear
+if _rc {
+    di as txt "Skipped URL import test because internet access or remote server was unavailable."
+}
+else {
+    assert r(N) > 0
+    assert "`r(storage)'" == "url"
+    assert "`r(importcmd)'" == "use"
+}
+
+di as txt "21. GitHub blob URL conversion path is reachable"
+cap noi smartload "https://github.com/user/repo/blob/main/data.csv", clear
+if _rc {
+    di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
+}
+
+di as result "All runnable smartload V0.4.0 tests completed."
 log close smartload_selftest

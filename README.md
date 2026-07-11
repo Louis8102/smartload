@@ -1,4 +1,4 @@
-# smartload V0.3.7 Notes
+# smartload V0.4.0 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
 
@@ -12,15 +12,17 @@ smartload workbook.xlsx, firstrow clear
 smartload panel.parquet, clear
 smartload table.dbf, clear
 smartload fixed_dictionary.dct, clear
+smartload "https://www.stata-press.com/data/r18/auto.dta", clear
+smartload "https://raw.githubusercontent.com/user/repo/main/data.csv", clear
 ```
 
-The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.3.7 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
+The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.4.0 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
 
-`smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan.
+For local file names, `smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan. For `http://` or `https://` URLs, `smartload` skips local search and imports directly from the URL.
 
 ## Installation
 
-V0.3.7 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
+V0.4.0 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -84,7 +86,7 @@ When you run:
 smartload filename.ext, clear
 ```
 
-V0.3.7 uses this order:
+V0.4.0 uses this order for local file names:
 
 1. On Windows, use Everything's command-line interface `es.exe` if available.
 2. Search `smartload_index.dta`, if it exists.
@@ -99,7 +101,7 @@ smartload, installes
 
 The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
 
-V0.3.7 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+V0.4.0 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
 
 ```stata
 smartload, refresh drives(all)
@@ -107,6 +109,43 @@ smartload, refresh drives(C F)
 ```
 
 Future versions may add additional optional accelerators such as Spotlight on macOS or locate/plocate on Linux when a stable command-line interface is available.
+
+## Localized Cloud Drives
+
+`smartload` supports cloud-drive files when they are locally synced or mounted as ordinary folders/drives. Examples include OneDrive, Dropbox, Google Drive for desktop, Box Drive, and SharePoint Sync when the files appear under a local path such as:
+
+```text
+C:\Users\Hao Ma\OneDrive\...
+G:\My Drive\...
+C:\Users\Hao Ma\Dropbox\...
+```
+
+For best speed, mark important cloud data folders as "Always keep on this device" or the equivalent setting in the cloud client, and let Everything index those local cloud folders. If a file is online-only, `smartload` may find the placeholder path but Stata import can still pause while the cloud client downloads the file.
+
+Authenticated cloud accounts are not the same thing as local indexing. Even after a user signs in to Google Drive, OneDrive, Dropbox, Box, or SharePoint in a browser, `smartload` cannot promise instant cloud-wide search unless those files are exposed locally or a provider-specific API workflow is added. Pure browser-only cloud files without a local path are outside the instant local-search guarantee.
+
+Without Everything, users can index selected local cloud roots:
+
+```stata
+smartload, refresh roots("C:\Users\Hao Ma\OneDrive;G:\My Drive;C:\Users\Hao Ma\Dropbox")
+```
+
+## URL and GitHub Imports
+
+When the input starts with `http://` or `https://`, `smartload` treats it as a URL and does not search the local computer:
+
+```stata
+smartload "https://www.stata-press.com/data/r18/auto.dta", clear
+smartload "https://raw.githubusercontent.com/user/repo/main/data.csv", clear
+```
+
+Common GitHub `blob` URLs are converted to raw URLs automatically:
+
+```stata
+smartload "https://github.com/user/repo/blob/main/data.csv", clear
+```
+
+URL support is intended for direct data-file URLs, not general web pages. A URL must point to an actual data file with a supported extension. For `.dct`, use local files because the dictionary usually references a companion raw data file.
 
 ## Duplicate File Names
 
@@ -127,7 +166,7 @@ smartload Indicator.dta, choice(2) clear
 
 ## Supported Native Imports
 
-V0.3.7 imports Stata-readable data files through Stata's native commands:
+V0.4.0 imports Stata-readable data files through Stata's native commands:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -140,13 +179,15 @@ V0.3.7 imports Stata-readable data files through Stata's native commands:
 - `.dbf` via `import dbase`
 - `.dct` fixed-format dictionaries via `infix using`
 
+The same extension-based dispatch is used for direct URLs when Stata's native command can read that URL.
+
 The Stata menu also includes JDBC, ODBC, FRED, and Haver entries. These are connection/data-source workflows rather than ordinary files found by file name on disk, so they are outside the `smartload filename.ext` workflow.
 
 For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable labels and value labels are preserved whenever Stata can preserve them.
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.3.7:
+These files are indexed/detected but not automatically imported in V0.4.0:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
 - Document containers: `.docx`, `.doc`, `.pptx`, `.ppt`, `.pdf`
@@ -155,7 +196,7 @@ These files are indexed/detected but not automatically imported in V0.3.7:
 
 R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
 
-DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.7 detects them but does not claim accurate table extraction.
+DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.4.0 detects them but does not claim accurate table extraction.
 
 ## Files
 
@@ -177,7 +218,7 @@ smartload/
 
 ## Version
 
-- Version: 0.3.7
+- Version: 0.4.0
 - Date: 2026-07-10
 - Author: Hao Ma
 - License: MIT
