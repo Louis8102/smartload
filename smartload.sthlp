@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.5.2 11jul2026}{...}
+{* *! version 0.6.0 11jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -39,7 +39,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.5.2 first uses Everything's
+to remember the folder path.  Version 0.6.0 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -54,10 +54,12 @@ Daily use:
 {phang2}{cmd:. smartload fixed_dictionary.dct, clear}{p_end}
 {phang2}{cmd:. smartload report.docx, table(1) firstrow clear}{p_end}
 {phang2}{cmd:. smartload slides.pptx, table(1) firstrow clear}{p_end}
+{phang2}{cmd:. smartload web_tables.html, table(1) firstrow clear}{p_end}
+{phang2}{cmd:. smartload "https://example.com/page.html", table(1) firstrow clear}{p_end}
 {phang2}{cmd:. smartload "https://www.stata-press.com/data/r18/auto.dta", clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.5.2 also
+The standard Stata syntax uses a comma before options.  Version 0.6.0 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -69,8 +71,10 @@ Recommended first setup:
 
 {pstd}
 If the input starts with {cmd:http://} or {cmd:https://}, {cmd:smartload}
-treats it as a direct data-file URL and skips local search.  Common GitHub
-{cmd:blob} URLs are converted to raw GitHub URLs automatically.
+treats it as a URL and skips local search.  Direct data-file URLs are imported
+with Stata's native commands.  Web pages are scanned for true HTML
+{cmd:<table>} elements.  Common GitHub {cmd:blob} URLs are converted to raw
+GitHub URLs automatically.
 
 {pstd}
 Cloud-drive files are supported when they are locally synced or mounted as
@@ -83,7 +87,7 @@ rate limits.  Pure browser-only cloud files without a local path are outside
 the instant local-search guarantee.
 
 {pstd}
-If Everything finds a same-named file on a normal drive, version 0.5.2 still
+If Everything finds a same-named file on a normal drive, version 0.6.0 still
 performs a bounded check of common local cloud roots such as {cmd:Box},
 {cmd:OneDrive}, {cmd:Dropbox}, {cmd:Google Drive}, and {cmd:SharePoint}, then
 merges those candidates before prompting.
@@ -123,8 +127,9 @@ prompted.
 
 {phang}
 {cmd:table(}{it:#}{cmd:)} selects a true Office table from a DOCX or PPTX
-file.  If the option is omitted, one true table is imported directly; multiple
-true tables are displayed as numbered choices.
+file, or a true HTML table from an HTML file/web page.  If the option is
+omitted, one true table is imported directly; multiple true tables are
+displayed as numbered choices.
 
 {phang}
 {cmd:clear}, {cmd:sheet()}, {cmd:firstrow}, and {cmd:encoding()} are passed to
@@ -152,7 +157,8 @@ path.
 {cmd:.parquet} via {cmd:import parquet}; {cmd:.dbf} via
 {cmd:import dbase}; {cmd:.dct} fixed-format dictionaries via
 {cmd:infix using}; {cmd:.docx} and {cmd:.pptx} true Office tables via
-experimental Office table extraction.
+experimental Office table extraction; {cmd:.html} and {cmd:.htm} true HTML
+tables via experimental HTML table extraction.
 
 {pstd}
 DOCX/PPTX support is limited to real Office table objects.  It does not OCR
@@ -163,15 +169,23 @@ a table directly and {cmd:firstrow} when the first table row contains variable
 names.
 
 {pstd}
+HTML support is limited to real {cmd:<table>} elements in local HTML files or
+web pages.  It does not execute JavaScript, infer CSS grid/div visual tables,
+or OCR image tables.  If a page contains images but no true table,
+{cmd:smartload} explains that OCR would be required and does not import
+silently.
+
+{pstd}
 JDBC, ODBC, FRED, and Haver entries in Stata's import menu are data-source
 workflows rather than ordinary disk files found by file name; they are outside
 the {cmd:smartload filename.ext} workflow.
 
 {pstd}
 The same extension-based dispatch is used for direct URLs when Stata's native
-command can read that URL.  URL {cmd:.dct} files are not imported because a
-dictionary normally references a companion raw data file; download both files
-to the same local folder first.
+command can read that URL.  URLs with {cmd:.html}/{cmd:.htm}, or URLs without
+a visible extension, are treated as web pages and scanned for true HTML tables.
+URL {cmd:.dct} files are not imported because a dictionary normally references
+a companion raw data file; download both files to the same local folder first.
 
 {pstd}
 For SPSS files, {cmd:smartload} uses Stata's native {cmd:import spss} so
@@ -187,8 +201,14 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.5.2 detects them but does not claim accurate table extraction for
+Version 0.6.0 detects them but does not claim accurate table extraction for
 legacy DOC/PPT or PDF files.
+
+{pstd}
+Web pages may contain true HTML tables, CSS/JavaScript visual tables, or image
+tables.  Version 0.6.0 imports true HTML tables only.  CSS/JavaScript visual
+tables and image-only tables are detected/explained rather than silently
+imported.
 
 {title:Duplicate File Names}
 
@@ -217,6 +237,8 @@ In interactive Stata, type the number to import.  In batch mode, use
 {phang2}{cmd:. smartload fixed_dictionary.dct, clear}{p_end}
 {phang2}{cmd:. smartload report.docx, table(1) firstrow clear}{p_end}
 {phang2}{cmd:. smartload slides.pptx, table(1) firstrow clear}{p_end}
+{phang2}{cmd:. smartload web_tables.html, table(1) firstrow clear}{p_end}
+{phang2}{cmd:. smartload "https://example.com/page.html", table(1) firstrow clear}{p_end}
 {phang2}{cmd:. smartload "https://github.com/user/repo/blob/main/data.csv", clear}{p_end}
 {phang2}{cmd:. smartload workbook.xlsx, sheet("Sheet1") firstrow clear}{p_end}
 {phang2}{cmd:. smartload, refresh roots("F:\Project;G:\Data")}{p_end}
@@ -239,5 +261,6 @@ MIT License.  See {cmd:LICENSE}.
 
 {pstd}
 Hao Ma.
+
 
 

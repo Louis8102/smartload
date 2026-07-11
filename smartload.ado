@@ -1,4 +1,4 @@
-*! smartload 0.5.2 11jul2026 Hao Ma
+*! smartload 0.6.0 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -207,6 +207,7 @@ program define smartload, rclass
     if `hpos' > 0 loc extpath = substr(`"`extpath'"', 1, `hpos' - 1)
     mata: st_local("ext", strlower(pathsuffix(st_local("extpath"))))
     loc ext : subinstr loc ext "." "", all
+    if `isurl' & `"`ext'"' == "" loc ext "html"
     loc importcmd ""
 
     if `logrequested' {
@@ -331,6 +332,12 @@ program define smartload, rclass
         loc office_ntables = r(ntables)
         loc importcmd "office table extraction"
     }
+    else if inlist("`ext'", "html", "htm") {
+        smartload__html_table, filepath(`"`loadpath'"') storage(`"`storage'"') table(`table') `clear' `firstrow'
+        loc html_table = r(table)
+        loc html_ntables = r(ntables)
+        loc importcmd "html table extraction"
+    }
     else {
         smartload__detected `"`filepath'"' "`filename'" "`ext'" "`lh'" "`logrequested'" "`ocr'"
         return local filepath `"`filepath'"'
@@ -349,6 +356,10 @@ program define smartload, rclass
     if inlist("`ext'", "docx", "pptx") {
         return scalar table = `office_table'
         return scalar ntables = `office_ntables'
+    }
+    if inlist("`ext'", "html", "htm") {
+        return scalar table = `html_table'
+        return scalar ntables = `html_ntables'
     }
     qui ds
     loc k : word count `r(varlist)'
@@ -369,6 +380,7 @@ program define smartload, rclass
     else if "`ext'" == "dct" loc typename "Fixed-format dictionary"
     else if "`ext'" == "docx" loc typename "Word table"
     else if "`ext'" == "pptx" loc typename "PowerPoint table"
+    else if inlist("`ext'", "html", "htm") loc typename "HTML table"
     di as txt "Detected type: `typename'"
     di as txt "Command used: `importcmd'"
     di as txt "Storage location: `storage'"
@@ -408,6 +420,7 @@ program define smartload__urlmatch, rclass
     mata: st_local("base", pathbasename(st_local("clean")))
     mata: st_local("ext", strlower(pathsuffix(st_local("clean"))))
     loc ext : subinstr loc ext "." "", all
+    if `"`ext'"' == "" loc ext "html"
 
     loc slash = 0
     forvalues i = 1/`=strlen(`"`clean'"')' {
@@ -507,6 +520,77 @@ program define smartload__office_table, rclass
     if "`clear'" != "" loc opts "`opts' clear"
     import delimited using `"`csv'"', `opts'
     return local importcmd "office table extraction"
+    return scalar table = `table'
+    return scalar ntables = `ntables'
+end
+
+program define smartload__html_table, rclass
+    version 19.5
+    syntax , FILEPATH(string) STORAGE(string) TABLE(integer) [CLEAR FIRSTROW]
+
+    tempfile html csv
+    if "`storage'" == "url" {
+        cap copy `"`filepath'"' `"`html'"', replace
+        if _rc {
+            di as err "Could not download the web page or HTML file."
+            exit _rc
+        }
+        loc htmlpath `"`html'"'
+    }
+    else {
+        loc htmlpath `"`filepath'"'
+    }
+
+    mata: st_numscalar("r(ntables)", smartload_html_table_count(st_local("htmlpath")))
+    loc ntables = r(ntables)
+    if `ntables' == 0 {
+        mata: st_numscalar("r(nimages)", smartload_html_image_count(st_local("htmlpath")))
+        loc nimages = r(nimages)
+        di as err "No true HTML <table> elements were found."
+        if `nimages' > 0 {
+            di as txt "This page contains image elements. If the table is a screenshot or picture, OCR is required and is not run automatically."
+        }
+        else {
+            di as txt "The page may use ordinary text, CSS grid/div layout, JavaScript rendering, or another non-table structure."
+        }
+        exit 498
+    }
+
+    if `table' < 1 {
+        if `ntables' == 1 {
+            loc table 1
+        }
+        else {
+            di as err "Found multiple true HTML tables:"
+            forvalues i = 1/`ntables' {
+                mata: st_local("preview", smartload_html_table_preview(st_local("htmlpath"), `i'))
+                di as txt "`i'. `preview'"
+            }
+            if c(mode) == "batch" {
+                di as err "Batch mode cannot prompt for an HTML table choice."
+                di as txt "Use {cmd:table(#)}."
+                exit 459
+            }
+            di as txt "Type the number of the table to import, then press Enter."
+            cap macro drop SMARTLOAD_TABLE_CHOICE
+            display _request(SMARTLOAD_TABLE_CHOICE)
+            loc table = strtrim("$SMARTLOAD_TABLE_CHOICE")
+        }
+    }
+
+    cap confirm integer number `table'
+    if _rc | real("`table'") < 1 | real("`table'") > `ntables' {
+        di as err "Invalid table selection. No file was imported."
+        exit 198
+    }
+
+    mata: smartload_html_table_to_csv(st_local("htmlpath"), strtoreal(st_local("table")), st_local("csv"))
+    loc opts ""
+    if "`firstrow'" != "" loc opts "`opts' varnames(1)"
+    else loc opts "`opts' varnames(nonames)"
+    if "`clear'" != "" loc opts "`opts' clear"
+    import delimited using `"`csv'"', `opts'
+    return local importcmd "html table extraction"
     return scalar table = `table'
     return scalar ntables = `ntables'
 end
@@ -932,7 +1016,7 @@ program define smartload__scanroot, rclass
                 mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
                 loc ext : subinstr loc ext "." "", all
                 loc extok 0
-                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt v8xpt parquet dbf dct pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
+                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt v8xpt parquet dbf dct html htm pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
                     if "`ext'" == "`ok'" loc extok 1
                 }
                 if `extok' {
@@ -1233,6 +1317,181 @@ string rowvector smartload_semicolon_split(string scalar s)
         if (part != "") out = out, part
     }
     return(out)
+}
+
+real scalar smartload_html_image_count(string scalar htmlfile)
+{
+    string scalar html, lhtml
+    real scalar p, count
+
+    html = smartload_readfile(htmlfile)
+    lhtml = strlower(html)
+    p = 1
+    count = 0
+    while ((p = smartload_posfrom(lhtml, "<img", p)) > 0) {
+        count++
+        p = p + 4
+    }
+    return(count)
+}
+
+real scalar smartload_html_table_count(string scalar htmlfile)
+{
+    string scalar html, lhtml
+    real scalar p, gt, q, count
+
+    html = smartload_readfile(htmlfile)
+    lhtml = strlower(html)
+    p = 1
+    count = 0
+    while ((p = smartload_posfrom(lhtml, "<table", p)) > 0) {
+        gt = smartload_posfrom(lhtml, ">", p)
+        if (gt == 0) break
+        q = smartload_posfrom(lhtml, "</table>", gt + 1)
+        if (q == 0) break
+        count++
+        p = q + 8
+    }
+    return(count)
+}
+
+string scalar smartload_html_text(string scalar s)
+{
+    real scalar p, gt
+    string scalar out
+
+    out = ""
+    p = 1
+    while (p <= strlen(s)) {
+        if (substr(s, p, 1) == "<") {
+            gt = smartload_posfrom(s, ">", p)
+            if (gt == 0) break
+            out = out + " "
+            p = gt + 1
+        }
+        else {
+            out = out + substr(s, p, 1)
+            p++
+        }
+    }
+    out = subinstr(out, char(9), " ", .)
+    out = subinstr(out, char(10), " ", .)
+    out = subinstr(out, char(13), " ", .)
+    out = subinstr(out, "&nbsp;", " ", .)
+    out = smartload_xml_unescape(out)
+    while (strpos(out, "  ") > 0) out = subinstr(out, "  ", " ", .)
+    return(strtrim(out))
+}
+
+string rowvector smartload_html_row_cells(string scalar row)
+{
+    string scalar lrow, close, cell
+    string rowvector cells
+    real scalar p, ptd, pth, gt, q
+
+    lrow = strlower(row)
+    cells = J(1, 0, "")
+    p = 1
+    while (p <= strlen(row)) {
+        ptd = smartload_posfrom(lrow, "<td", p)
+        pth = smartload_posfrom(lrow, "<th", p)
+        if (ptd == 0 & pth == 0) break
+        if (ptd > 0 & (pth == 0 | ptd < pth)) {
+            p = ptd
+            close = "</td>"
+        }
+        else {
+            p = pth
+            close = "</th>"
+        }
+        gt = smartload_posfrom(lrow, ">", p)
+        if (gt == 0) break
+        q = smartload_posfrom(lrow, close, gt + 1)
+        if (q == 0) break
+        cell = substr(row, gt + 1, q - gt - 1)
+        cells = cells, smartload_html_text(cell)
+        p = q + strlen(close)
+    }
+    return(cells)
+}
+
+void smartload_html_collect(string scalar htmlfile, real scalar wanted, string matrix rows, real scalar maxc)
+{
+    string scalar html, lhtml, tbl, row
+    string rowvector cells
+    real scalar p, gt, q, rp, rgt, rq, count
+
+    html = smartload_readfile(htmlfile)
+    lhtml = strlower(html)
+    p = 1
+    count = 0
+    rows = J(0, 0, "")
+    maxc = 0
+
+    while ((p = smartload_posfrom(lhtml, "<table", p)) > 0) {
+        gt = smartload_posfrom(lhtml, ">", p)
+        if (gt == 0) break
+        q = smartload_posfrom(lhtml, "</table>", gt + 1)
+        if (q == 0) break
+        count++
+        if (count == wanted) {
+            tbl = substr(html, gt + 1, q - gt - 1)
+            rp = 1
+            while ((rp = smartload_posfrom(strlower(tbl), "<tr", rp)) > 0) {
+                rgt = smartload_posfrom(tbl, ">", rp)
+                if (rgt == 0) break
+                rq = smartload_posfrom(strlower(tbl), "</tr>", rgt + 1)
+                if (rq == 0) break
+                row = substr(tbl, rgt + 1, rq - rgt - 1)
+                cells = smartload_html_row_cells(row)
+                if (cols(cells) > 0) {
+                    if (cols(cells) > maxc) maxc = cols(cells)
+                    if (cols(rows) == 0) rows = cells
+                    else {
+                        if (cols(cells) < cols(rows)) cells = cells, J(1, cols(rows)-cols(cells), "")
+                        if (cols(cells) > cols(rows)) rows = rows, J(rows(rows), cols(cells)-cols(rows), "")
+                        rows = rows \ cells
+                    }
+                }
+                rp = rq + 5
+            }
+            if (cols(rows) < maxc) rows = rows, J(rows(rows), maxc-cols(rows), "")
+            return
+        }
+        p = q + 8
+    }
+}
+
+string scalar smartload_html_table_preview(string scalar htmlfile, real scalar wanted)
+{
+    string matrix rows
+    string scalar preview
+    real scalar maxc, j
+
+    smartload_html_collect(htmlfile, wanted, rows, maxc)
+    if (rows(rows) == 0 | maxc == 0) return("(no readable text preview)")
+    preview = ""
+    for (j=1; j<=min((3, cols(rows))); j++) {
+        if (rows[1,j] != "") {
+            if (preview != "") preview = preview + " | "
+            preview = preview + rows[1,j]
+        }
+    }
+    if (preview == "") preview = "(no readable text preview)"
+    return(strofreal(rows(rows)) + " rows, " + strofreal(maxc) + " columns; " + preview)
+}
+
+void smartload_html_table_to_csv(string scalar htmlfile, real scalar wanted, string scalar csvfile)
+{
+    string matrix rows
+    real scalar maxc
+
+    smartload_html_collect(htmlfile, wanted, rows, maxc)
+    if (rows(rows) == 0 | maxc == 0) {
+        errprintf("Selected HTML table has no readable text cells.\n")
+        _error(498)
+    }
+    smartload_write_csv(rows, csvfile)
 }
 
 real scalar smartload_office_table_count(string scalar xmlfiles, string scalar ext)
