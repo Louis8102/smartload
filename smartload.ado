@@ -1,4 +1,4 @@
-*! smartload 0.6.3 11jul2026 Hao Ma
+*! smartload 0.6.4 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -536,14 +536,24 @@ program define smartload__html_table, rclass
     if "`storage'" == "url" {
         loc html `"`htmltmp'.html"'
         cap copy `"`filepath'"' `"`html'"', replace
-        if _rc {
-            di as err "Could not download the web page or HTML file."
-            exit _rc
-        }
+        loc dlrc = _rc
         cap confirm file `"`html'"'
-        if _rc {
+        loc filemissing = _rc
+        if (`dlrc' | `filemissing') & "`c(os)'" == "Windows" {
+            cap shell curl.exe -L --fail --silent --show-error -A "Mozilla/5.0" -o `"`html'"' `"`filepath'"'
+            loc curlrc = _rc
+            cap confirm file `"`html'"'
+            loc filemissing = _rc
+            if !`curlrc' & !`filemissing' loc dlrc = 0
+        }
+        if `dlrc' {
+            di as err "Could not download the web page or HTML file."
+            di as txt "Stata's downloader failed. On Windows, smartload also tried curl.exe when available."
+            exit `dlrc'
+        }
+        if `filemissing' {
             di as err "The web page download did not create a readable temporary HTML file."
-            di as txt "The server may block Stata's downloader, require browser JavaScript, or require authentication."
+            di as txt "The server may block Stata/curl downloads, require browser JavaScript, or require authentication."
             exit 601
         }
         loc htmlpath `"`html'"'

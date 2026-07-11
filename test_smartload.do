@@ -277,7 +277,8 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.6.3 tests completed."
+di as result "All runnable smartload V0.6.4 tests completed."
 log close smartload_selftest
+
 
 
