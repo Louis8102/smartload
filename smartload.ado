@@ -1,9 +1,9 @@
-*! smartload 0.5.0 10jul2026 Hao Ma
+*! smartload 0.5.1 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
         DRIVES(string) CHOICE(integer -1) CLEAR SHEET(string) FIRSTROW ///
-        ENCODING(string) OCR LOG REPLACE MAXDIRS(integer 2500) TABLE(integer 1)]
+        ENCODING(string) OCR LOG REPLACE MAXDIRS(integer 2500) TABLE(integer -1)]
 
     smartload__indexpath
     loc indexfile `"`r(indexfile)'"'
@@ -462,6 +462,38 @@ program define smartload__office_table, rclass
         if substr(`"`xmlfiles'"', 1, 1) == ";" loc xmlfiles = substr(`"`xmlfiles'"', 2, strlen(`"`xmlfiles'"') - 1)
     }
 
+    mata: st_numscalar("r(ntables)", smartload_office_table_count(st_local("xmlfiles"), st_local("ext")))
+    loc ntables = r(ntables)
+    if `ntables' == 0 {
+        di as err "No true Office tables were found in this .`ext' file."
+        exit 498
+    }
+    if `table' < 1 {
+        if `ntables' == 1 {
+            loc table 1
+        }
+        else {
+            di as err "Found multiple true Office tables in this .`ext' file:"
+            forvalues i = 1/`ntables' {
+                mata: st_local("preview", smartload_office_table_preview(st_local("xmlfiles"), st_local("ext"), `i'))
+                di as txt "`i'. `preview'"
+            }
+            if c(mode) == "batch" {
+                di as err "Batch mode cannot prompt for an Office table choice."
+                di as txt "Use {cmd:table(#)}."
+                exit 459
+            }
+            di as txt "Type the number of the table to import, then press Enter."
+            cap macro drop SMARTLOAD_TABLE_CHOICE
+            display _request(SMARTLOAD_TABLE_CHOICE)
+            loc table = strtrim("$SMARTLOAD_TABLE_CHOICE")
+        }
+    }
+    cap confirm integer number `table'
+    if _rc | real("`table'") < 1 | real("`table'") > `ntables' {
+        di as err "Invalid table selection. No file was imported."
+        exit 198
+    }
     mata: smartload_office_table_to_csv(st_local("xmlfiles"), st_local("ext"), strtoreal(st_local("table")), st_local("csv"))
     loc opts ""
     if "`firstrow'" != "" loc opts "`opts' varnames(1)"
@@ -469,6 +501,8 @@ program define smartload__office_table, rclass
     if "`clear'" != "" loc opts "`opts' clear"
     import delimited using `"`csv'"', `opts'
     return local importcmd "office table extraction"
+    return scalar table = `table'
+    return scalar ntables = `ntables'
 end
 
 program define smartload__everything, rclass
@@ -1108,12 +1142,17 @@ string scalar smartload_xml_unescape(string scalar s)
 string scalar smartload_cell_text(string scalar cell, string scalar prefix)
 {
     real scalar p, gt, q
-    string scalar open, close, out
+    string scalar open, close, out, next
     open = "<" + prefix + ":t"
     close = "</" + prefix + ":t>"
     out = ""
     p = 1
     while ((p = smartload_posfrom(cell, open, p)) > 0) {
+        next = substr(cell, p + strlen(open), 1)
+        if (!(next == ">" | next == " " | next == char(9) | next == char(13) | next == char(10))) {
+            p = p + strlen(open)
+            continue
+        }
         gt = smartload_posfrom(cell, ">", p)
         if (gt == 0) break
         q = smartload_posfrom(cell, close, gt + 1)
@@ -1166,6 +1205,90 @@ void smartload_write_csv(string matrix rows, string scalar csvfile)
         fput(fh, line)
     }
     fclose(fh)
+}
+
+real scalar smartload_office_table_count(string scalar xmlfiles, string scalar ext)
+{
+    string rowvector files
+    string scalar xml, prefix, tblopen, tblclose
+    real scalar f, p, gt, q, count
+
+    files = tokens(xmlfiles, ";")
+    prefix = (ext == "docx" ? "w" : "a")
+    tblopen = "<" + prefix + ":tbl"
+    tblclose = "</" + prefix + ":tbl>"
+    count = 0
+
+    for (f=1; f<=cols(files); f++) {
+        xml = smartload_readfile(files[f])
+        p = 1
+        while ((p = smartload_posfrom(xml, tblopen, p)) > 0) {
+            gt = smartload_posfrom(xml, ">", p)
+            if (gt == 0) break
+            q = smartload_posfrom(xml, tblclose, gt + 1)
+            if (q == 0) break
+            count++
+            p = q + strlen(tblclose)
+        }
+    }
+    return(count)
+}
+
+string scalar smartload_office_table_preview(string scalar xmlfiles, string scalar ext, real scalar wanted)
+{
+    string rowvector files, cells
+    string scalar xml, prefix, tblopen, tblclose, rowopen, rowclose, tbl, row, preview
+    real scalar f, p, gt, q, rp, rgt, rq, count, nrows, maxc, j
+
+    files = tokens(xmlfiles, ";")
+    prefix = (ext == "docx" ? "w" : "a")
+    tblopen = "<" + prefix + ":tbl"
+    tblclose = "</" + prefix + ":tbl>"
+    rowopen = "<" + prefix + ":tr"
+    rowclose = "</" + prefix + ":tr>"
+    count = 0
+
+    for (f=1; f<=cols(files); f++) {
+        xml = smartload_readfile(files[f])
+        p = 1
+        while ((p = smartload_posfrom(xml, tblopen, p)) > 0) {
+            gt = smartload_posfrom(xml, ">", p)
+            if (gt == 0) break
+            q = smartload_posfrom(xml, tblclose, gt + 1)
+            if (q == 0) break
+            count++
+            if (count == wanted) {
+                tbl = substr(xml, gt + 1, q - gt - 1)
+                rp = 1
+                nrows = 0
+                maxc = 0
+                preview = ""
+                while ((rp = smartload_posfrom(tbl, rowopen, rp)) > 0) {
+                    rgt = smartload_posfrom(tbl, ">", rp)
+                    if (rgt == 0) break
+                    rq = smartload_posfrom(tbl, rowclose, rgt + 1)
+                    if (rq == 0) break
+                    nrows++
+                    row = substr(tbl, rgt + 1, rq - rgt - 1)
+                    cells = smartload_row_cells(row, prefix)
+                    if (cols(cells) > maxc) maxc = cols(cells)
+                    if (preview == "" & cols(cells) > 0) {
+                        for (j=1; j<=min((3, cols(cells))); j++) {
+                            if (cells[j] != "") {
+                                if (preview != "") preview = preview + " | "
+                                preview = preview + cells[j]
+                            }
+                        }
+                    }
+                    rp = rq + strlen(rowclose)
+                }
+                if (preview == "") preview = "(no readable text preview)"
+                return(strofreal(nrows) + " rows, " + strofreal(maxc) + " columns; " + preview)
+            }
+            p = q + strlen(tblclose)
+        }
+    }
+    return("(table not found)")
 }
 
 void smartload_office_table_to_csv(string scalar xmlfiles, string scalar ext, real scalar wanted, string scalar csvfile)

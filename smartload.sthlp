@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.5.0 10jul2026}{...}
+{* *! version 0.5.1 11jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -39,7 +39,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.5.0 first uses Everything's
+to remember the folder path.  Version 0.5.1 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -57,7 +57,7 @@ Daily use:
 {phang2}{cmd:. smartload "https://www.stata-press.com/data/r18/auto.dta", clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.5.0 also
+The standard Stata syntax uses a comma before options.  Version 0.5.1 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -83,7 +83,7 @@ rate limits.  Pure browser-only cloud files without a local path are outside
 the instant local-search guarantee.
 
 {pstd}
-If Everything finds a same-named file on a normal drive, version 0.5.0 still
+If Everything finds a same-named file on a normal drive, version 0.5.1 still
 performs a bounded check of common local cloud roots such as {cmd:Box},
 {cmd:OneDrive}, {cmd:Dropbox}, {cmd:Google Drive}, and {cmd:SharePoint}, then
 merges those candidates before prompting.
@@ -123,7 +123,8 @@ prompted.
 
 {phang}
 {cmd:table(}{it:#}{cmd:)} selects a true Office table from a DOCX or PPTX
-file.  The default is {cmd:table(1)}.
+file.  If the option is omitted, one true table is imported directly; multiple
+true tables are displayed as numbered choices.
 
 {phang}
 {cmd:clear}, {cmd:sheet()}, {cmd:firstrow}, and {cmd:encoding()} are passed to
@@ -156,8 +157,10 @@ experimental Office table extraction.
 {pstd}
 DOCX/PPTX support is limited to real Office table objects.  It does not OCR
 screenshots, pictures, scanned tables, legacy DOC/PPT files, merged-cell
-layouts, or arbitrary page text.  Use {cmd:table(#)} to select a table and
-{cmd:firstrow} when the first table row contains variable names.
+layouts, or arbitrary page text.  If several true tables are found, interactive
+Stata users are asked to choose a numbered table.  Use {cmd:table(#)} to select
+a table directly and {cmd:firstrow} when the first table row contains variable
+names.
 
 {pstd}
 JDBC, ODBC, FRED, and Haver entries in Stata's import menu are data-source
@@ -184,7 +187,7 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.5.0 detects them but does not claim accurate table extraction for
+Version 0.5.1 detects them but does not claim accurate table extraction for
 legacy DOC/PPT or PDF files.
 
 {title:Duplicate File Names}
@@ -236,3 +239,4 @@ MIT License.  See {cmd:LICENSE}.
 
 {pstd}
 Hao Ma.
+

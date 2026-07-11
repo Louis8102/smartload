@@ -43,7 +43,7 @@ file close fh
 cap mkdir "`base'\docxbuild"
 cap mkdir "`base'\docxbuild\word"
 file open fh using "`base'\docxbuild\word\document.xml", write text replace
-file write fh `"<w:document><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>id</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>score</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>10</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>2</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>20</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"'
+file write fh `"<w:document><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Times New Roman"/></w:rPr><w:t>id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>score</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>10</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>20</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"'
 file close fh
 local oldpwd "`c(pwd)'"
 qui cd "`base'\docxbuild"
@@ -54,7 +54,7 @@ cap mkdir "`base'\pptxbuild"
 cap mkdir "`base'\pptxbuild\ppt"
 cap mkdir "`base'\pptxbuild\ppt\slides"
 file open fh using "`base'\pptxbuild\ppt\slides\slide1.xml", write text replace
-file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>id</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>score</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>1</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>100</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>2</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>200</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
+file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:rPr lang="en-US"/><a:t>id</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>score</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>1</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>100</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>2</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>200</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
 file close fh
 local oldpwd "`c(pwd)'"
 qui cd "`base'\pptxbuild"
@@ -191,12 +191,16 @@ smartload report.docx, table(1) firstrow clear
 assert r(N) == 2
 assert r(k) == 2
 assert "`r(importcmd)'" == "office table extraction"
+assert id[1] == 1
+assert score[2] == 20
 
 di as txt "18. PPTX true Office table imports"
 smartload slides.pptx, table(1) firstrow clear
 assert r(N) == 2
 assert r(k) == 2
 assert "`r(importcmd)'" == "office table extraction"
+assert id[1] == 1
+assert score[2] == 200
 
 di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
@@ -219,5 +223,5 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.5.0 tests completed."
+di as result "All runnable smartload V0.5.1 tests completed."
 log close smartload_selftest
