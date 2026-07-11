@@ -1,4 +1,4 @@
-*! smartload 0.6.5 11jul2026 Hao Ma
+*! smartload 0.6.6 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -538,47 +538,22 @@ program define smartload__html_table, rclass
         loc dlrc = 601
         loc filemissing = 1
         cap erase `"`html'"'
-        if "`c(os)'" == "Windows" {
-            cap shell curl.exe --location --fail --silent --show-error --compressed --http1.1 --user-agent "Mozilla/5.0 (Windows NT; smartload)" --output `"`html'"' `"`filepath'"'
-            loc curlrc = _rc
-            cap confirm file `"`html'"'
-            loc filemissing = _rc
-            if !`curlrc' & !`filemissing' loc dlrc = 0
-        }
-        if `filemissing' {
-            cap copy `"`filepath'"' `"`html'"', replace
-            loc copyrc = _rc
-            cap confirm file `"`html'"'
-            loc filemissing = _rc
-            if !`copyrc' & !`filemissing' loc dlrc = 0
-            else if `copyrc' loc dlrc = `copyrc'
-        }
-        if `filemissing' & "`c(os)'" == "Windows" {
-            tempfile ps1
-            loc ps `"`ps1'.ps1"'
-            loc psurl = subinstr(`"`filepath'"', "'", "''", .)
-            loc psout = subinstr(`"`html'"', "'", "''", .)
-            cap file close slps
-            file open slps using `"`ps'"', write text replace
-            file write slps "$ProgressPreference = 'SilentlyContinue'" _n
-            file write slps "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12" _n
-            file write slps "$headers = @{ 'User-Agent' = 'Mozilla/5.0 (Windows NT; smartload)' }" _n
-            file write slps `"Invoke-WebRequest -Uri '`psurl'' -OutFile '`psout'' -UseBasicParsing -Headers $headers"' _n
-            file close slps
-            cap shell powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"`ps'"'
-            loc psrc = _rc
-            cap confirm file `"`html'"'
-            loc filemissing = _rc
-            if !`psrc' & !`filemissing' loc dlrc = 0
-        }
+        cap copy `"`filepath'"' `"`html'"', replace
+        loc copyrc = _rc
+        cap confirm file `"`html'"'
+        loc filemissing = _rc
+        if !`copyrc' & !`filemissing' loc dlrc = 0
+        else if `copyrc' loc dlrc = `copyrc'
         if `dlrc' {
             di as err "Could not download the web page or HTML file."
-            di as txt "smartload tried browser-style curl, Stata copy, and Windows PowerShell when available."
+            di as txt "smartload uses Stata's native downloader for SSC-style portability."
+            di as txt "If the page opens in a browser but Stata cannot download it, save the page as a local .html file and run smartload on that file."
             exit `dlrc'
         }
         if `filemissing' {
             di as err "The web page download did not create a readable temporary HTML file."
-            di as txt "The server may block non-browser downloads, require JavaScript, or require authentication."
+            di as txt "The server may block Stata downloads, require JavaScript, or require authentication."
+            di as txt "Save the page as a local .html file and run smartload on that file."
             exit 601
         }
         loc htmlpath `"`html'"'
