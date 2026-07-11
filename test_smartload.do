@@ -289,7 +289,20 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.6.6 tests completed."
+di as txt "22. Google Docs and Sheets share URLs are normalized"
+tempfile googlematch
+smartload__urlmatch, url("https://docs.google.com/spreadsheets/d/abc123/edit?gid=987") saving("`googlematch'")
+use "`googlematch'", clear
+assert filename[1] == "google_sheet.csv"
+assert ext[1] == "csv"
+assert strpos(filepath[1], "/export?format=csv") > 0
+smartload__urlmatch, url("https://docs.google.com/document/d/doc456/edit") saving("`googlematch'")
+use "`googlematch'", clear
+assert filename[1] == "google_doc.html"
+assert ext[1] == "html"
+assert strpos(filepath[1], "/export?format=html") > 0
+
+di as result "All runnable smartload V0.6.7 tests completed."
 log close smartload_selftest
 
 

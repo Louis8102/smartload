@@ -1,4 +1,4 @@
-*! smartload 0.6.6 11jul2026 Hao Ma
+*! smartload 0.6.7 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -404,13 +404,50 @@ program define smartload__urlmatch, rclass
 
     loc u `"`url'"'
     loc ul = lower(`"`u'"')
+    loc githubconv = 0
+    loc gsheetconv = 0
+    loc gdocconv = 0
     if strpos(`"`ul'"', "https://github.com/") == 1 & strpos(`"`ul'"', "/blob/") > 0 {
         loc u = subinstr(`"`u'"', "https://github.com/", "https://raw.githubusercontent.com/", 1)
         loc u = subinstr(`"`u'"', "/blob/", "/", 1)
+        loc githubconv = 1
     }
     if strpos(`"`ul'"', "http://github.com/") == 1 & strpos(`"`ul'"', "/blob/") > 0 {
         loc u = subinstr(`"`u'"', "http://github.com/", "https://raw.githubusercontent.com/", 1)
         loc u = subinstr(`"`u'"', "/blob/", "/", 1)
+        loc githubconv = 1
+    }
+    if strpos(`"`ul'"', "https://docs.google.com/spreadsheets/d/") == 1 | strpos(`"`ul'"', "http://docs.google.com/spreadsheets/d/") == 1 {
+        loc dpos = strpos(`"`u'"', "/d/")
+        loc rest = substr(`"`u'"', `dpos' + 3, .)
+        loc slash = strpos(`"`rest'"', "/")
+        if `slash' > 0 loc gid = substr(`"`rest'"', 1, `slash' - 1)
+        else loc gid `"`rest'"'
+        loc sheetgid "0"
+        loc gidpos = strpos(lower(`"`u'"'), "gid=")
+        if `gidpos' > 0 {
+            loc aftergid = substr(`"`u'"', `gidpos' + 4, .)
+            loc amp = strpos(`"`aftergid'"', "&")
+            loc hash = strpos(`"`aftergid'"', "#")
+            loc stop = 0
+            if `amp' > 0 loc stop = `amp'
+            if `hash' > 0 & (`stop' == 0 | `hash' < `stop') loc stop = `hash'
+            if `stop' > 0 loc sheetgid = substr(`"`aftergid'"', 1, `stop' - 1)
+            else loc sheetgid `"`aftergid'"'
+        }
+        loc u `"https://docs.google.com/spreadsheets/d/`gid'/export?format=csv&gid=`sheetgid'"'
+        loc ul = lower(`"`u'"')
+        loc gsheetconv = 1
+    }
+    if strpos(`"`ul'"', "https://docs.google.com/document/d/") == 1 | strpos(`"`ul'"', "http://docs.google.com/document/d/") == 1 {
+        loc dpos = strpos(`"`u'"', "/d/")
+        loc rest = substr(`"`u'"', `dpos' + 3, .)
+        loc slash = strpos(`"`rest'"', "/")
+        if `slash' > 0 loc docid = substr(`"`rest'"', 1, `slash' - 1)
+        else loc docid `"`rest'"'
+        loc u `"https://docs.google.com/document/d/`docid'/export?format=html"'
+        loc ul = lower(`"`u'"')
+        loc gdocconv = 1
     }
 
     loc clean `"`u'"'
@@ -423,6 +460,14 @@ program define smartload__urlmatch, rclass
     if `"`base'"' == "" loc base "index.html"
     mata: st_local("ext", strlower(pathsuffix(st_local("clean"))))
     loc ext : subinstr loc ext "." "", all
+    if strpos(lower(`"`u'"'), "docs.google.com/spreadsheets/") > 0 {
+        loc base "google_sheet.csv"
+        loc ext "csv"
+    }
+    if strpos(lower(`"`u'"'), "docs.google.com/document/") > 0 {
+        loc base "google_doc.html"
+        loc ext "html"
+    }
     if `"`ext'"' == "" loc ext "html"
     if inlist("`ext'", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc ext "html"
 
@@ -439,7 +484,9 @@ program define smartload__urlmatch, rclass
     postclose `posth'
 
     di as txt "Detected URL input; smartload will import directly from the URL."
-    if `"`u'"' != `"`url'"' di as txt "GitHub blob URL converted to raw URL."
+    if `githubconv' di as txt "GitHub blob URL converted to raw URL."
+    if `gsheetconv' di as txt "Google Sheets URL converted to CSV export URL."
+    if `gdocconv' di as txt "Google Docs URL converted to HTML export URL."
     return scalar N = 1
     return local url `"`u'"'
 end
