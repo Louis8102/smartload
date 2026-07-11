@@ -1,4 +1,4 @@
-*! smartload 0.3.6 10jul2026 Hao Ma
+*! smartload 0.3.7 10jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -239,9 +239,14 @@ program define smartload, rclass
         loc importcmd "import sas"
     }
     else if "`ext'" == "xpt" {
-        if "`clear'" != "" import sasxport using "`loadpath'", clear
-        else import sasxport using "`loadpath'"
-        loc importcmd "import sasxport"
+        if "`clear'" != "" import sasxport5 using "`loadpath'", clear
+        else import sasxport5 using "`loadpath'"
+        loc importcmd "import sasxport5"
+    }
+    else if "`ext'" == "v8xpt" {
+        if "`clear'" != "" import sasxport8 using "`loadpath'", clear
+        else import sasxport8 using "`loadpath'"
+        loc importcmd "import sasxport8"
     }
     else if "`ext'" == "parquet" {
         if "`clear'" != "" import parquet using "`loadpath'", clear
@@ -252,6 +257,24 @@ program define smartload, rclass
         if "`clear'" != "" import dbase using "`loadpath'", clear
         else import dbase using "`loadpath'"
         loc importcmd "import dbase"
+    }
+    else if "`ext'" == "dct" {
+        if "`clear'" != "" clear
+        loc dctpath = subinstr(`"`loadpath'"', char(92), "/", .)
+        mata: st_local("dctbase", pathbasename(st_local("dctpath")))
+        loc slash = 0
+        forvalues i = 1/`=strlen(`"`dctpath'"')' {
+            if substr(`"`dctpath'"', `i', 1) == "/" loc slash = `i'
+        }
+        loc dctdir = ""
+        if `slash' > 1 loc dctdir = substr(`"`dctpath'"', 1, `slash' - 1)
+        loc oldpwd `"`c(pwd)'"'
+        if `"`dctdir'"' != "" qui cd `"`dctdir'"'
+        cap noi infix using `"`dctbase'"'
+        loc dctrc = _rc
+        qui cd `"`oldpwd'"'
+        if `dctrc' exit `dctrc'
+        loc importcmd "infix using"
     }
     else {
         smartload__detected `"`filepath'"' "`filename'" "`ext'" "`lh'" "`logrequested'" "`ocr'"
@@ -281,9 +304,10 @@ program define smartload, rclass
     else if inlist("`ext'", "xlsx", "xls") loc typename "Excel workbook"
     else if inlist("`ext'", "csv", "txt", "tsv", "dat") loc typename "Delimited text candidate"
     else if inlist("`ext'", "sav", "por") loc typename "SPSS data file"
-    else if inlist("`ext'", "sas7bdat", "xpt") loc typename "SAS data file"
+    else if inlist("`ext'", "sas7bdat", "xpt", "v8xpt") loc typename "SAS data file"
     else if "`ext'" == "parquet" loc typename "Parquet data file"
     else if "`ext'" == "dbf" loc typename "dBASE/DBF database table"
+    else if "`ext'" == "dct" loc typename "Fixed-format dictionary"
     di as txt "Detected type: `typename'"
     di as txt "Command used: `importcmd'"
     di as txt "Storage location: `storage'"
@@ -699,7 +723,7 @@ program define smartload__scanroot, rclass
                 mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
                 loc ext : subinstr loc ext "." "", all
                 loc extok 0
-                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt parquet dbf pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
+                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt v8xpt parquet dbf dct pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
                     if "`ext'" == "`ok'" loc extok 1
                 }
                 if `extok' {

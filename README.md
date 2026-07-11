@@ -1,4 +1,4 @@
-# smartload V0.3.6 Notes
+# smartload V0.3.7 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
 
@@ -11,15 +11,16 @@ smartload city.sas7bdat, clear
 smartload workbook.xlsx, firstrow clear
 smartload panel.parquet, clear
 smartload table.dbf, clear
+smartload fixed_dictionary.dct, clear
 ```
 
-The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.3.6 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
+The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.3.7 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
 
 `smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan.
 
 ## Installation
 
-V0.3.6 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
+V0.3.7 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -83,7 +84,7 @@ When you run:
 smartload filename.ext, clear
 ```
 
-V0.3.6 uses this order:
+V0.3.7 uses this order:
 
 1. On Windows, use Everything's command-line interface `es.exe` if available.
 2. Search `smartload_index.dta`, if it exists.
@@ -98,7 +99,7 @@ smartload, installes
 
 The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
 
-V0.3.6 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+V0.3.7 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
 
 ```stata
 smartload, refresh drives(all)
@@ -126,22 +127,26 @@ smartload Indicator.dta, choice(2) clear
 
 ## Supported Native Imports
 
-V0.3.6 imports Stata-readable data files through Stata's native commands:
+V0.3.7 imports Stata-readable data files through Stata's native commands:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
 - `.csv`, `.txt`, `.tsv`, and text-like `.dat` via `import delimited`
 - `.sav` and `.por` via `import spss`
 - `.sas7bdat` via `import sas`
-- `.xpt` via `import sasxport`
+- `.xpt` via `import sasxport5`
+- `.v8xpt` via `import sasxport8`
 - `.parquet` via `import parquet`
 - `.dbf` via `import dbase`
+- `.dct` fixed-format dictionaries via `infix using`
+
+The Stata menu also includes JDBC, ODBC, FRED, and Haver entries. These are connection/data-source workflows rather than ordinary files found by file name on disk, so they are outside the `smartload filename.ext` workflow.
 
 For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable labels and value labels are preserved whenever Stata can preserve them.
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.3.6:
+These files are indexed/detected but not automatically imported in V0.3.7:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
 - Document containers: `.docx`, `.doc`, `.pptx`, `.ppt`, `.pdf`
@@ -150,7 +155,7 @@ These files are indexed/detected but not automatically imported in V0.3.6:
 
 R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
 
-DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.6 detects them but does not claim accurate table extraction.
+DOCX/PPT/PDF files may contain visual tables, but they are document containers. V0.3.7 detects them but does not claim accurate table extraction.
 
 ## Files
 
@@ -172,7 +177,7 @@ smartload/
 
 ## Version
 
-- Version: 0.3.6
+- Version: 0.3.7
 - Date: 2026-07-10
 - Author: Hao Ma
 - License: MIT

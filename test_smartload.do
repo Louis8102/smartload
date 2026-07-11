@@ -52,6 +52,19 @@ file open fh using "`base'\root1\data.rds", write text replace
 file write fh "placeholder for R object"
 file close fh
 
+file open fh using "`base'\root1\sample_fixed.raw", write text replace
+file write fh "001010" _n
+file write fh "002020" _n
+file write fh "003030" _n
+file close fh
+
+file open fh using "`base'\root1\sample_fixed.dct", write text replace
+file write fh `"infix dictionary using "sample_fixed.raw" {"' _n
+file write fh "id 1-3" _n
+file write fh "value 4-6" _n
+file write fh "}" _n
+file close fh
+
 di as txt "1. ado loads"
 which smartload
 
@@ -125,6 +138,12 @@ else {
     di as txt "Skipped dbf import test because export dbase failed on this Stata installation."
 }
 
+di as txt "9c. fixed-format dictionary .dct import succeeds"
+smartload sample_fixed.dct, clear
+assert r(N) == 3
+assert r(k) == 2
+assert "`r(importcmd)'" == "infix using"
+
 di as txt "10. log output exists"
 confirm file smartload_log.txt
 
@@ -166,5 +185,5 @@ di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
 assert "`r(status)'" == "detected_not_imported"
 
-di as result "All runnable smartload V0.3.6 tests completed."
+di as result "All runnable smartload V0.3.7 tests completed."
 log close smartload_selftest

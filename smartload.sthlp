@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.3.6 10jul2026}{...}
+{* *! version 0.3.7 10jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -38,7 +38,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.3.6 first uses Everything's
+to remember the folder path.  Version 0.3.7 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -50,9 +50,10 @@ Daily use:
 {phang2}{cmd:. smartload survey.sav, clear}{p_end}
 {phang2}{cmd:. smartload panel.parquet, clear}{p_end}
 {phang2}{cmd:. smartload table.dbf, clear}{p_end}
+{phang2}{cmd:. smartload fixed_dictionary.dct, clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.3.6 also
+The standard Stata syntax uses a comma before options.  Version 0.3.7 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -116,9 +117,16 @@ path.
 {cmd:.dta} via {cmd:use}; {cmd:.xlsx} and {cmd:.xls} via {cmd:import excel};
 {cmd:.csv}, {cmd:.txt}, {cmd:.tsv}, and text-like {cmd:.dat} via
 {cmd:import delimited}; {cmd:.sav} and {cmd:.por} via {cmd:import spss};
-{cmd:.sas7bdat} via {cmd:import sas}; {cmd:.xpt} via {cmd:import sasxport};
+{cmd:.sas7bdat} via {cmd:import sas}; {cmd:.xpt} via
+{cmd:import sasxport5}; {cmd:.v8xpt} via {cmd:import sasxport8};
 {cmd:.parquet} via {cmd:import parquet}; {cmd:.dbf} via
-{cmd:import dbase}.
+{cmd:import dbase}; {cmd:.dct} fixed-format dictionaries via
+{cmd:infix using}.
+
+{pstd}
+JDBC, ODBC, FRED, and Haver entries in Stata's import menu are data-source
+workflows rather than ordinary disk files found by file name; they are outside
+the {cmd:smartload filename.ext} workflow.
 
 {pstd}
 For SPSS files, {cmd:smartload} uses Stata's native {cmd:import spss} so
@@ -134,7 +142,7 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.3.6 detects them but does not claim accurate table extraction.
+Version 0.3.7 detects them but does not claim accurate table extraction.
 
 {title:Duplicate File Names}
 
@@ -160,6 +168,7 @@ In interactive Stata, type the number to import.  In batch mode, use
 {phang2}{cmd:. smartload city.sas7bdat, clear}{p_end}
 {phang2}{cmd:. smartload lake.parquet, clear}{p_end}
 {phang2}{cmd:. smartload table.dbf, clear}{p_end}
+{phang2}{cmd:. smartload fixed_dictionary.dct, clear}{p_end}
 {phang2}{cmd:. smartload workbook.xlsx, sheet("Sheet1") firstrow clear}{p_end}
 {phang2}{cmd:. smartload, refresh roots("F:\Project;G:\Data")}{p_end}
 {phang2}{cmd:. smartload, refresh drives(all)}   // slow{p_end}
