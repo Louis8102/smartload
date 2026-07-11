@@ -1,6 +1,6 @@
 # smartload V0.6.4 Notes
 
-`smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
+`smartload` is an SSC-style Stata command. It loads a local data file by file name, without requiring the user to remember the folder path.
 
 The basic idea is simple:
 
