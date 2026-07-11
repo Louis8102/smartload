@@ -1,14 +1,14 @@
 v 3
 d smartload: find a named data file and load it into Stata
-d Version: 0.6.4
+d Version: 0.6.5
 d
 d smartload loads data files by file name without requiring the folder path.
 d It imports DTA, Excel, CSV/text, SPSS, SAS, XPT/V8XPT, Parquet, DBF, and DCT dictionaries using native Stata commands.
 d It experimentally extracts true Office tables from DOCX and PPTX files.
-d It experimentally extracts true HTML tables from local HTML files and web-page URLs.
+d It experimentally extracts true HTML tables and escaped table code examples from local HTML files and web-page URLs.
 d Common server-page URLs such as .asp, .aspx, .php, .jsp, .cfm, and .cgi are treated as HTML pages.
 d Web-page URLs ending in a slash are treated as HTML pages.
-d On Windows, web-page downloads fall back to curl.exe if Stata's downloader fails.
+d On Windows, web-page downloads try browser-style curl.exe, Stata copy, then PowerShell when available.
 d On Windows, it can use Everything's es.exe command-line interface when available.
 d It imports direct http/https data-file URLs and converts common GitHub blob URLs to raw URLs.
 d It supports locally synced cloud-drive folders such as OneDrive, Google Drive, Dropbox, Box, and SharePoint Sync.

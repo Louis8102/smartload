@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.6.4 11jul2026}{...}
+{* *! version 0.6.5 11jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -39,7 +39,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.6.4 first uses Everything's
+to remember the folder path.  Version 0.6.5 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -61,7 +61,7 @@ Daily use:
 {phang2}{cmd:. smartload "https://www.stata-press.com/data/r18/auto.dta", clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.6.4 also
+The standard Stata syntax uses a comma before options.  Version 0.6.5 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -89,7 +89,7 @@ rate limits.  Pure browser-only cloud files without a local path are outside
 the instant local-search guarantee.
 
 {pstd}
-If Everything finds a same-named file on a normal drive, version 0.6.4 still
+If Everything finds a same-named file on a normal drive, version 0.6.5 still
 performs a bounded check of common local cloud roots such as {cmd:Box},
 {cmd:OneDrive}, {cmd:Dropbox}, {cmd:Google Drive}, and {cmd:SharePoint}, then
 merges those candidates before prompting.
@@ -105,8 +105,7 @@ merges those candidates before prompting.
 {cmd:installes} downloads the official 64-bit Everything command-line
 interface, {cmd:ES-1.1.0.30.x64.zip}, from voidtools and places
 {cmd:es.exe} under the user's PERSONAL ado folder in {cmd:smartload_bin}.
-It first tries Stata's downloader and then Windows {cmd:curl.exe}.  This
-option is for Windows.  It installs only ES, not Everything itself.
+This option is for Windows.  It installs only ES, not Everything itself.
 Everything must already be installed and running for ES searches to work.
 
 {phang}
@@ -175,8 +174,9 @@ names.
 {pstd}
 HTML support is limited to real {cmd:<table>} elements in local HTML files or
 web pages, including common server-page URLs such as {cmd:.asp} and {cmd:.php}.
-It does not execute JavaScript, infer CSS grid/div visual tables, or OCR image
-tables.  If a page contains images but no true table,
+It also tries escaped table code examples such as {cmd:&lt;table&gt;}.  It does
+not execute JavaScript, infer CSS grid/div visual tables, or OCR image tables.
+If a page contains images but no true table,
 {cmd:smartload} explains that OCR would be required and does not import
 silently.
 
@@ -189,7 +189,8 @@ the {cmd:smartload filename.ext} workflow.
 The same extension-based dispatch is used for direct URLs when Stata's native
 command can read that URL.  URLs with {cmd:.html}/{cmd:.htm}, common server
 page extensions such as {cmd:.asp}, URLs without a visible extension, or URLs
-ending in a slash are treated as web pages and scanned for true HTML tables.
+ending in a slash are treated as web pages and scanned for true HTML tables or
+escaped table code examples.
 URL {cmd:.dct} files are not imported because a dictionary normally references
 a companion raw data file; download both files to the same local folder first.
 
@@ -207,22 +208,22 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.6.4 detects them but does not claim accurate table extraction for
+Version 0.6.5 detects them but does not claim accurate table extraction for
 legacy DOC/PPT or PDF files.
 
 {pstd}
-Web pages may contain true HTML tables, CSS/JavaScript visual tables, or image
-tables.  Version 0.6.4 imports true HTML tables only.  CSS/JavaScript visual
-tables and image-only tables are detected/explained rather than silently
-imported.
+Web pages may contain true HTML tables, escaped table code examples,
+CSS/JavaScript visual tables, or image tables.  Version 0.6.5 imports true HTML
+tables and tries escaped table code examples.  CSS/JavaScript visual tables and
+image-only tables are detected/explained rather than silently imported.
 
 {pstd}
 Some servers may block Stata's built-in downloader, require browser JavaScript,
-or require authentication.  On Windows, if Stata's downloader fails for a web
-page, {cmd:smartload} also tries the system {cmd:curl.exe} with redirects
-enabled and a browser-style User-Agent.  If the page still cannot be saved as
-readable HTML, {cmd:smartload} reports that clearly instead of showing an
-internal parser error.
+or require authentication.  On Windows, web-page imports try browser-style
+{cmd:curl.exe}, Stata's downloader, and PowerShell {cmd:Invoke-WebRequest}
+when available.  If the page still cannot be saved as readable HTML,
+{cmd:smartload} reports that clearly instead of showing an internal parser
+error.
 
 {title:Duplicate File Names}
 

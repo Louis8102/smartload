@@ -1,4 +1,4 @@
-*! smartload 0.6.4 11jul2026 Hao Ma
+*! smartload 0.6.5 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -535,25 +535,50 @@ program define smartload__html_table, rclass
     tempfile htmltmp csv
     if "`storage'" == "url" {
         loc html `"`htmltmp'.html"'
-        cap copy `"`filepath'"' `"`html'"', replace
-        loc dlrc = _rc
-        cap confirm file `"`html'"'
-        loc filemissing = _rc
-        if (`dlrc' | `filemissing') & "`c(os)'" == "Windows" {
-            cap shell curl.exe -L --fail --silent --show-error -A "Mozilla/5.0" -o `"`html'"' `"`filepath'"'
+        loc dlrc = 601
+        loc filemissing = 1
+        cap erase `"`html'"'
+        if "`c(os)'" == "Windows" {
+            cap shell curl.exe --location --fail --silent --show-error --compressed --http1.1 --user-agent "Mozilla/5.0 (Windows NT; smartload)" --output `"`html'"' `"`filepath'"'
             loc curlrc = _rc
             cap confirm file `"`html'"'
             loc filemissing = _rc
             if !`curlrc' & !`filemissing' loc dlrc = 0
         }
+        if `filemissing' {
+            cap copy `"`filepath'"' `"`html'"', replace
+            loc copyrc = _rc
+            cap confirm file `"`html'"'
+            loc filemissing = _rc
+            if !`copyrc' & !`filemissing' loc dlrc = 0
+            else if `copyrc' loc dlrc = `copyrc'
+        }
+        if `filemissing' & "`c(os)'" == "Windows" {
+            tempfile ps1
+            loc ps `"`ps1'.ps1"'
+            loc psurl = subinstr(`"`filepath'"', "'", "''", .)
+            loc psout = subinstr(`"`html'"', "'", "''", .)
+            cap file close slps
+            file open slps using `"`ps'"', write text replace
+            file write slps "$ProgressPreference = 'SilentlyContinue'" _n
+            file write slps "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12" _n
+            file write slps "$headers = @{ 'User-Agent' = 'Mozilla/5.0 (Windows NT; smartload)' }" _n
+            file write slps `"Invoke-WebRequest -Uri '`psurl'' -OutFile '`psout'' -UseBasicParsing -Headers $headers"' _n
+            file close slps
+            cap shell powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"`ps'"'
+            loc psrc = _rc
+            cap confirm file `"`html'"'
+            loc filemissing = _rc
+            if !`psrc' & !`filemissing' loc dlrc = 0
+        }
         if `dlrc' {
             di as err "Could not download the web page or HTML file."
-            di as txt "Stata's downloader failed. On Windows, smartload also tried curl.exe when available."
+            di as txt "smartload tried browser-style curl, Stata copy, and Windows PowerShell when available."
             exit `dlrc'
         }
         if `filemissing' {
             di as err "The web page download did not create a readable temporary HTML file."
-            di as txt "The server may block Stata/curl downloads, require browser JavaScript, or require authentication."
+            di as txt "The server may block non-browser downloads, require JavaScript, or require authentication."
             exit 601
         }
         loc htmlpath `"`html'"'
@@ -1362,6 +1387,7 @@ real scalar smartload_html_table_count(string scalar htmlfile)
     real scalar p, gt, q, count
 
     html = smartload_readfile(htmlfile)
+    html = smartload_html_for_tables(html)
     lhtml = strlower(html)
     p = 1
     count = 0
@@ -1443,6 +1469,7 @@ void smartload_html_collect(string scalar htmlfile, real scalar wanted, string m
     real scalar p, gt, q, rp, rgt, rq, count
 
     html = smartload_readfile(htmlfile)
+    html = smartload_html_for_tables(html)
     lhtml = strlower(html)
     p = 1
     count = 0
@@ -1481,6 +1508,19 @@ void smartload_html_collect(string scalar htmlfile, real scalar wanted, string m
         }
         p = q + 8
     }
+}
+
+string scalar smartload_html_for_tables(string scalar html)
+{
+    string scalar lhtml, decoded
+
+    lhtml = strlower(html)
+    if (strpos(lhtml, "<table") > 0) return(html)
+
+    decoded = smartload_xml_unescape(html)
+    if (strpos(strlower(decoded), "<table") > 0) return(decoded)
+
+    return(html)
 }
 
 string scalar smartload_html_table_preview(string scalar htmlfile, real scalar wanted)

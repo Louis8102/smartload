@@ -9,6 +9,7 @@ if _rc {
     di as error "smartload.ado was not found on the adopath. Run this do-file from the folder containing smartload.ado."
     exit 601
 }
+which smartload
 
 tempfile basefile
 local base "`basefile'_dir"
@@ -47,6 +48,10 @@ copy "`base'\root1\web_tables.html" "`base'\root1\web_tables.asp", replace
 
 file open fh using "`base'\root1\image_table.html", write text replace
 file write fh `"<html><body><p>This page has a table screenshot.</p><img src="table.png" alt="table image"></body></html>"'
+file close fh
+
+file open fh using "`base'\root1\encoded_tables.html", write text replace
+file write fh `"<html><body><pre>&lt;table&gt;&lt;tr&gt;&lt;th&gt;first&lt;/th&gt;&lt;th&gt;last&lt;/th&gt;&lt;th&gt;idnum&lt;/th&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Sarah&lt;/td&gt;&lt;td&gt;Johnson&lt;/td&gt;&lt;td&gt;54&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;Michael&lt;/td&gt;&lt;td&gt;Chen&lt;/td&gt;&lt;td&gt;4567&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;</pre></body></html>"'
 file close fh
 
 cap mkdir "`base'\docxbuild"
@@ -244,7 +249,14 @@ di as txt "18e. HTML image-only table is detected but not imported"
 cap noi smartload image_table.html, clear
 assert _rc == 498
 
-di as txt "18f. Server-page extension with HTML table imports"
+di as txt "18f. Encoded HTML table code block imports"
+smartload encoded_tables.html, table(1) firstrow clear
+assert r(N) == 2
+assert r(k) == 3
+assert first[1] == "Sarah"
+assert idnum[2] == 4567
+
+di as txt "18g. Server-page extension with HTML table imports"
 smartload web_tables.asp, table(1) firstrow clear
 assert r(N) == 2
 assert r(k) == 2
@@ -252,7 +264,7 @@ assert "`r(importcmd)'" == "html table extraction"
 assert id[1] == 1
 assert score[2] == 20
 
-di as txt "18g. URL ending in slash is treated as HTML page"
+di as txt "18h. URL ending in slash is treated as HTML page"
 cap noi smartload "https://designsystem.digital.gov/components/table/", table(1) clear
 assert _rc != 198
 
@@ -277,7 +289,7 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.6.4 tests completed."
+di as result "All runnable smartload V0.6.5 tests completed."
 log close smartload_selftest
 
 
