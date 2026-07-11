@@ -1,4 +1,4 @@
-# smartload V0.6.7 Notes
+# smartload V0.6.8 Notes
 
 `smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
 
@@ -24,13 +24,13 @@ smartload "https://docs.google.com/spreadsheets/d/FILEID/edit#gid=0", clear
 smartload "https://docs.google.com/document/d/FILEID/edit", table(1) firstrow clear
 ```
 
-The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.6.7 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
+The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.6.8 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
 
 For local file names, `smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan. For `http://` or `https://` URLs, `smartload` skips local search and imports directly from the URL. Direct data-file URLs are imported with Stata's native commands. Web pages are scanned for true HTML `<table>` elements.
 
 ## Installation
 
-V0.6.7 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
+V0.6.8 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -94,7 +94,7 @@ When you run:
 smartload filename.ext, clear
 ```
 
-V0.6.7 uses this order for local file names:
+V0.6.8 uses this order for local file names:
 
 1. On Windows, use Everything's command-line interface `es.exe` if available.
 2. Search `smartload_index.dta`, if it exists.
@@ -109,7 +109,7 @@ smartload, installes
 
 The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
 
-V0.6.7 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+V0.6.8 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
 
 ```stata
 smartload, refresh drives(all)
@@ -130,7 +130,7 @@ C:\Users\YourName\Dropbox\...
 
 For best speed, mark important cloud data folders as "Always keep on this device" or the equivalent setting in the cloud client, and let Everything index those local cloud folders. If a file is online-only, `smartload` may find the placeholder path but Stata import can still pause while the cloud client downloads the file.
 
-If Everything finds a same-named file on a normal drive, V0.6.7 still performs a bounded check of common local cloud roots such as `C:\Users\...\Box`, `OneDrive`, `Dropbox`, `Google Drive`, and `SharePoint`. This prevents a local Box/OneDrive copy from being silently missed just because Everything returned another copy first.
+If Everything finds a same-named file on a normal drive, V0.6.8 still performs a bounded check of common local cloud roots such as `C:\Users\...\Box`, `OneDrive`, `Dropbox`, `Google Drive`, and `SharePoint`. This prevents a local Box/OneDrive copy from being silently missed just because Everything returned another copy first.
 
 Authenticated cloud accounts are not the same thing as local indexing. Even after a user signs in to Google Drive, OneDrive, Dropbox, Box, or SharePoint in a browser, `smartload` cannot promise instant cloud-wide search unless those files are exposed locally or a provider-specific API workflow is added. Pure browser-only cloud files without a local path are outside the instant local-search guarantee.
 
@@ -157,7 +157,7 @@ smartload "https://github.com/user/repo/blob/main/data.csv", clear
 
 URL support covers direct data-file URLs and true HTML tables in web pages. For direct data files, the URL should point to a supported extension such as `.dta`, `.csv`, `.xlsx`, `.sav`, `.sas7bdat`, `.parquet`, or `.dbf`. For web pages, `smartload` parses real HTML `<table>` elements and also tries table markup that appears in escaped HTML code blocks, such as `&lt;table&gt;...&lt;/table&gt;`. Web-page URLs ending in `.html`, `.htm`, `.asp`, `.aspx`, `.php`, `.jsp`, `.cfm`, or `.cgi`, URLs without a visible extension, and URLs ending in a slash are treated as web pages. If exactly one table is found, it is imported directly. If several tables are found, interactive Stata users are asked to choose a numbered table; in batch mode use `table(#)`.
 
-Public Google links are handled separately from local synced Google Drive folders. A public Google Sheets share URL is converted to a CSV export URL. A public Google Docs share URL is converted to an HTML export URL, and then `smartload` extracts true HTML tables from that exported document. Private links that require Google login are not imported by the SSC-style default path; share the document publicly, publish it, download/export it locally, or use a future API/OAuth-enhanced workflow.
+Public Google links are handled separately from local synced Google Drive folders. A public Google Sheets share URL is converted to a CSV export URL and imported with `import delimited`; use `firstrow` when the first row contains variable names. A public Google Docs share URL is converted to an HTML export URL, and then `smartload` extracts true HTML tables from that exported document. Private links that require Google login are not imported by the SSC-style default path; share the document publicly, publish it, download/export it locally, or use a future API/OAuth-enhanced workflow.
 
 Web pages that only look tabular because of CSS grid/div layouts, JavaScript rendering, screenshots, or images are not imported automatically. If image elements are detected but no true `<table>` exists, `smartload` explains that OCR is required. OCR is deliberately not run by default because it is slower, less reliable, and usually requires external tools.
 
@@ -184,7 +184,7 @@ smartload Indicator.dta, choice(2) clear
 
 ## Supported Native Imports
 
-V0.6.7 imports Stata-readable data files through Stata's native commands:
+V0.6.8 imports Stata-readable data files through Stata's native commands:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -212,7 +212,7 @@ For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable lab
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.6.7:
+These files are indexed/detected but not automatically imported in V0.6.8:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
 - Document containers not supported as rectangular data: `.doc`, `.ppt`, `.pdf`
@@ -222,9 +222,9 @@ These files are indexed/detected but not automatically imported in V0.6.7:
 
 R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
 
-DOC/PPT/PDF files may contain visual tables, but they are document containers. V0.6.7 does not claim accurate table extraction for those formats. DOCX/PPTX support is limited to true Office table objects.
+DOC/PPT/PDF files may contain visual tables, but they are document containers. V0.6.8 does not claim accurate table extraction for those formats. DOCX/PPTX support is limited to true Office table objects.
 
-Web pages may contain true HTML tables, escaped table code examples, CSS/JavaScript visual tables, or image tables. V0.6.7 imports true HTML tables and tries escaped table code examples. Image tables require OCR and CSS/JavaScript visual tables require a different extraction strategy, so they are detected/explained rather than silently imported.
+Web pages may contain true HTML tables, escaped table code examples, CSS/JavaScript visual tables, or image tables. V0.6.8 imports true HTML tables and tries escaped table code examples. Image tables require OCR and CSS/JavaScript visual tables require a different extraction strategy, so they are detected/explained rather than silently imported.
 
 ## Files
 
@@ -246,7 +246,7 @@ smartload/
 
 ## Version
 
-- Version: 0.6.7
+- Version: 0.6.8
 - Date: 2026-07-11
 - Author: Hao Ma
 - License: MIT

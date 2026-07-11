@@ -296,13 +296,22 @@ use "`googlematch'", clear
 assert filename[1] == "google_sheet.csv"
 assert ext[1] == "csv"
 assert strpos(filepath[1], "/export?format=csv") > 0
+local filepath = filepath[1]
+local matchedext = ext[1]
+local extpath "`filepath'"
+local qpos = strpos("`extpath'", "?")
+if `qpos' > 0 local extpath = substr("`extpath'", 1, `qpos' - 1)
+mata: st_local("reext", strlower(pathsuffix(st_local("extpath"))))
+local reext : subinstr local reext "." "", all
+if "`matchedext'" != "" local reext "`matchedext'"
+assert "`reext'" == "csv"
 smartload__urlmatch, url("https://docs.google.com/document/d/doc456/edit") saving("`googlematch'")
 use "`googlematch'", clear
 assert filename[1] == "google_doc.html"
 assert ext[1] == "html"
 assert strpos(filepath[1], "/export?format=html") > 0
 
-di as result "All runnable smartload V0.6.7 tests completed."
+di as result "All runnable smartload V0.6.8 tests completed."
 log close smartload_selftest
 
 

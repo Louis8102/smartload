@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.6.7 11jul2026}{...}
+{* *! version 0.6.8 11jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -39,7 +39,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.6.7 first uses Everything's
+to remember the folder path.  Version 0.6.8 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -63,7 +63,7 @@ Daily use:
 {phang2}{cmd:. smartload "https://docs.google.com/document/d/FILEID/edit", table(1) firstrow clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.6.7 also
+The standard Stata syntax uses a comma before options.  Version 0.6.8 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -91,7 +91,7 @@ rate limits.  Pure browser-only cloud files without a local path are outside
 the instant local-search guarantee.
 
 {pstd}
-If Everything finds a same-named file on a normal drive, version 0.6.7 still
+If Everything finds a same-named file on a normal drive, version 0.6.8 still
 performs a bounded check of common local cloud roots such as {cmd:Box},
 {cmd:OneDrive}, {cmd:Dropbox}, {cmd:Google Drive}, and {cmd:SharePoint}, then
 merges those candidates before prompting.
@@ -197,10 +197,12 @@ URL {cmd:.dct} files are not imported because a dictionary normally references
 a companion raw data file; download both files to the same local folder first.
 
 {pstd}
-Public Google Sheets share URLs are converted to CSV export URLs.  Public Google
-Docs share URLs are converted to HTML export URLs and scanned for true HTML
-tables.  This is separate from local synced Google Drive folders.  Private links
-requiring Google login are not imported by the SSC-style default path.
+Public Google Sheets share URLs are converted to CSV export URLs and imported
+with {cmd:import delimited}; use {cmd:firstrow} when the first row contains
+variable names.  Public Google Docs share URLs are converted to HTML export URLs
+and scanned for true HTML tables.  This is separate from local synced Google
+Drive folders.  Private links requiring Google login are not imported by the
+SSC-style default path.
 
 {pstd}
 For SPSS files, {cmd:smartload} uses Stata's native {cmd:import spss} so
@@ -216,12 +218,12 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.6.7 detects them but does not claim accurate table extraction for
+Version 0.6.8 detects them but does not claim accurate table extraction for
 legacy DOC/PPT or PDF files.
 
 {pstd}
 Web pages may contain true HTML tables, escaped table code examples,
-CSS/JavaScript visual tables, or image tables.  Version 0.6.7 imports true HTML
+CSS/JavaScript visual tables, or image tables.  Version 0.6.8 imports true HTML
 tables and tries escaped table code examples.  CSS/JavaScript visual tables and
 image-only tables are detected/explained rather than silently imported.
 

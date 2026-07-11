@@ -1,4 +1,4 @@
-*! smartload 0.6.7 11jul2026 Hao Ma
+*! smartload 0.6.8 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -198,6 +198,7 @@ program define smartload, rclass
 
     loc filepath = filepath[1]
     loc storage = storage[1]
+    loc matchedext = ext[1]
     restore
 
     loc loadpath = subinstr(`"`filepath'"', char(92), "/", .)
@@ -208,6 +209,7 @@ program define smartload, rclass
     if `hpos' > 0 loc extpath = substr(`"`extpath'"', 1, `hpos' - 1)
     mata: st_local("ext", strlower(pathsuffix(st_local("extpath"))))
     loc ext : subinstr loc ext "." "", all
+    if `"`matchedext'"' != "" loc ext `"`matchedext'"'
     if `isurl' & `"`ext'"' == "" loc ext "html"
     if `isurl' & inlist("`ext'", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc ext "html"
     loc importcmd ""
@@ -234,6 +236,7 @@ program define smartload, rclass
     }
     else if inlist("`ext'", "csv", "txt") {
         loc opts ""
+        if "`firstrow'" != "" loc opts "`opts' varnames(1)"
         if `"`encoding'"' != "" loc opts `"`opts' encoding(`"`encoding'"')"'
         if "`clear'" != "" loc opts "`opts' clear"
         if `"`opts'"' != "" import delimited `"`loadpath'"', `opts'
@@ -242,6 +245,7 @@ program define smartload, rclass
     }
     else if "`ext'" == "tsv" {
         loc opts "delimiters(tab)"
+        if "`firstrow'" != "" loc opts "`opts' varnames(1)"
         if `"`encoding'"' != "" loc opts `"`opts' encoding(`"`encoding'"')"'
         if "`clear'" != "" loc opts "`opts' clear"
         import delimited `"`loadpath'"', `opts'
