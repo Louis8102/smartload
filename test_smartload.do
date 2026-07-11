@@ -43,6 +43,7 @@ file close fh
 file open fh using "`base'\root1\web_tables.html", write text replace
 file write fh `"<html><body><h1>tables</h1><table><tr><th>id</th><th>score</th></tr><tr><td>1</td><td>10</td></tr><tr><td>2</td><td>20</td></tr></table><table><tr><th>city</th><th>value</th></tr><tr><td>Austin</td><td>7</td></tr></table></body></html>"'
 file close fh
+copy "`base'\root1\web_tables.html" "`base'\root1\web_tables.asp", replace
 
 file open fh using "`base'\root1\image_table.html", write text replace
 file write fh `"<html><body><p>This page has a table screenshot.</p><img src="table.png" alt="table image"></body></html>"'
@@ -243,6 +244,14 @@ di as txt "18e. HTML image-only table is detected but not imported"
 cap noi smartload image_table.html, clear
 assert _rc == 498
 
+di as txt "18f. Server-page extension with HTML table imports"
+smartload web_tables.asp, table(1) firstrow clear
+assert r(N) == 2
+assert r(k) == 2
+assert "`r(importcmd)'" == "html table extraction"
+assert id[1] == 1
+assert score[2] == 20
+
 di as txt "19. RDS is detected but not imported"
 smartload data.rds, clear
 assert "`r(status)'" == "detected_not_imported"
@@ -264,6 +273,6 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as result "All runnable smartload V0.6.0 tests completed."
+di as result "All runnable smartload V0.6.1 tests completed."
 log close smartload_selftest
 

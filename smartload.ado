@@ -1,4 +1,4 @@
-*! smartload 0.6.0 11jul2026 Hao Ma
+*! smartload 0.6.1 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -208,6 +208,7 @@ program define smartload, rclass
     mata: st_local("ext", strlower(pathsuffix(st_local("extpath"))))
     loc ext : subinstr loc ext "." "", all
     if `isurl' & `"`ext'"' == "" loc ext "html"
+    if `isurl' & inlist("`ext'", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc ext "html"
     loc importcmd ""
 
     if `logrequested' {
@@ -332,7 +333,7 @@ program define smartload, rclass
         loc office_ntables = r(ntables)
         loc importcmd "office table extraction"
     }
-    else if inlist("`ext'", "html", "htm") {
+    else if inlist("`ext'", "html", "htm", "asp", "aspx", "php", "jsp", "cfm", "cgi") {
         smartload__html_table, filepath(`"`loadpath'"') storage(`"`storage'"') table(`table') `clear' `firstrow'
         loc html_table = r(table)
         loc html_ntables = r(ntables)
@@ -357,7 +358,7 @@ program define smartload, rclass
         return scalar table = `office_table'
         return scalar ntables = `office_ntables'
     }
-    if inlist("`ext'", "html", "htm") {
+    if inlist("`ext'", "html", "htm", "asp", "aspx", "php", "jsp", "cfm", "cgi") {
         return scalar table = `html_table'
         return scalar ntables = `html_ntables'
     }
@@ -380,7 +381,7 @@ program define smartload, rclass
     else if "`ext'" == "dct" loc typename "Fixed-format dictionary"
     else if "`ext'" == "docx" loc typename "Word table"
     else if "`ext'" == "pptx" loc typename "PowerPoint table"
-    else if inlist("`ext'", "html", "htm") loc typename "HTML table"
+    else if inlist("`ext'", "html", "htm", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc typename "HTML table"
     di as txt "Detected type: `typename'"
     di as txt "Command used: `importcmd'"
     di as txt "Storage location: `storage'"
@@ -421,6 +422,7 @@ program define smartload__urlmatch, rclass
     mata: st_local("ext", strlower(pathsuffix(st_local("clean"))))
     loc ext : subinstr loc ext "." "", all
     if `"`ext'"' == "" loc ext "html"
+    if inlist("`ext'", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc ext "html"
 
     loc slash = 0
     forvalues i = 1/`=strlen(`"`clean'"')' {
@@ -1016,7 +1018,7 @@ program define smartload__scanroot, rclass
                 mata: st_local("ext", strlower(pathsuffix(st_local("full"))))
                 loc ext : subinstr loc ext "." "", all
                 loc extok 0
-                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt v8xpt parquet dbf dct html htm pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
+                foreach ok in dta xlsx xls csv txt tsv dat sav por sas7bdat xpt v8xpt parquet dbf dct html htm asp aspx php jsp cfm cgi pdf docx doc pptx ppt rds rda rdata r feather pkl pickle arrow h5 hdf5 json jsonl sql sqlite db duckdb accdb mdb shp geojson gpkg kml kmz gdb zip gz 7z tar {
                     if "`ext'" == "`ok'" loc extok 1
                 }
                 if `extok' {
