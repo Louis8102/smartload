@@ -1,6 +1,6 @@
 v 3
 d smartload: find a named data file and load it into Stata
-d Version: 0.6.2
+d Version: 0.6.3
 d
 d smartload loads data files by file name without requiring the folder path.
 d It imports DTA, Excel, CSV/text, SPSS, SAS, XPT/V8XPT, Parquet, DBF, and DCT dictionaries using native Stata commands.
@@ -40,6 +40,7 @@ f example_data/smartload_example_table.docx
 f example_data/smartload_example_table.pptx
 f example_data/smartload_example_web_tables.html
 f example_data/smartload_example_image_table.html
+
 
 
 

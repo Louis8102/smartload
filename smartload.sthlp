@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.6.2 11jul2026}{...}
+{* *! version 0.6.3 11jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {title:Title}
@@ -39,7 +39,7 @@
 
 {pstd}
 {cmd:smartload} loads a data file by exact file name.  The user does not need
-to remember the folder path.  Version 0.6.2 first uses Everything's
+to remember the folder path.  Version 0.6.3 first uses Everything's
 {cmd:es.exe} on Windows if available, then searches the saved
 {cmd:smartload_index.dta}; if there is no match, it runs a bounded fast search
 over common user locations.
@@ -61,7 +61,7 @@ Daily use:
 {phang2}{cmd:. smartload "https://www.stata-press.com/data/r18/auto.dta", clear}{p_end}
 
 {pstd}
-The standard Stata syntax uses a comma before options.  Version 0.6.2 also
+The standard Stata syntax uses a comma before options.  Version 0.6.3 also
 tolerates common omitted-comma cases such as
 {cmd:. smartload filename.ext clear}; the final {cmd:clear} is treated as an
 option, not as part of the file name.
@@ -89,7 +89,7 @@ rate limits.  Pure browser-only cloud files without a local path are outside
 the instant local-search guarantee.
 
 {pstd}
-If Everything finds a same-named file on a normal drive, version 0.6.2 still
+If Everything finds a same-named file on a normal drive, version 0.6.3 still
 performs a bounded check of common local cloud roots such as {cmd:Box},
 {cmd:OneDrive}, {cmd:Dropbox}, {cmd:Google Drive}, and {cmd:SharePoint}, then
 merges those candidates before prompting.
@@ -207,14 +207,20 @@ imported automatically.  Convert them in R to {cmd:.dta}, {cmd:.parquet}, or
 
 {pstd}
 DOCX, PPTX, and PDF files may contain tables, but they are document containers.
-Version 0.6.2 detects them but does not claim accurate table extraction for
+Version 0.6.3 detects them but does not claim accurate table extraction for
 legacy DOC/PPT or PDF files.
 
 {pstd}
 Web pages may contain true HTML tables, CSS/JavaScript visual tables, or image
-tables.  Version 0.6.2 imports true HTML tables only.  CSS/JavaScript visual
+tables.  Version 0.6.3 imports true HTML tables only.  CSS/JavaScript visual
 tables and image-only tables are detected/explained rather than silently
 imported.
+
+{pstd}
+Some servers may block Stata's built-in downloader, require browser JavaScript,
+or require authentication.  In that case, {cmd:smartload} reports that the
+page could not be downloaded or that no readable temporary HTML file was
+created, instead of showing an internal parser error.
 
 {title:Duplicate File Names}
 
@@ -267,6 +273,7 @@ MIT License.  See {cmd:LICENSE}.
 
 {pstd}
 Hao Ma.
+
 
 
 

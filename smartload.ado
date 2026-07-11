@@ -1,4 +1,4 @@
-*! smartload 0.6.2 11jul2026 Hao Ma
+*! smartload 0.6.3 11jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -532,12 +532,19 @@ program define smartload__html_table, rclass
     version 19.5
     syntax , FILEPATH(string) STORAGE(string) TABLE(integer) [CLEAR FIRSTROW]
 
-    tempfile html csv
+    tempfile htmltmp csv
     if "`storage'" == "url" {
+        loc html `"`htmltmp'.html"'
         cap copy `"`filepath'"' `"`html'"', replace
         if _rc {
             di as err "Could not download the web page or HTML file."
             exit _rc
+        }
+        cap confirm file `"`html'"'
+        if _rc {
+            di as err "The web page download did not create a readable temporary HTML file."
+            di as txt "The server may block Stata's downloader, require browser JavaScript, or require authentication."
+            exit 601
         }
         loc htmlpath `"`html'"'
     }
