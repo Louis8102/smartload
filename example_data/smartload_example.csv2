@@ -1,0 +1,9 @@
+inspect_id;check_date;issue;inspector;check_mode;action;prod_code;batch_no;prod_line;supplier;sample_n;defect_n;defect_pct;severity;measure;tolerance;equip_id;shift;review;remarks
+A7K2M9Q4T6X1;2026-01-05;Seal ring does not close tightly;QA1A07;Warehouse sampling;Scrap and remelt;PRD-A101;BT260105A;LINE-01;SUP-A17;80;6;7,50;Critical;0,82;0,50;EQ-A101;Day;Verified;Seal pressure test failed
+B8L3N0R5U7Y2;2026-01-12;Crack on nut surface;QC2B14;Production line;Product recall;PRD-B205;BT260112B;LINE-02;SUP-B28;120;9;7,50;Critical;1,36;0,80;EQ-B207;Swing;Verified;Crack length exceeds acceptance limit
+C9M4P1S6V8Z3;2026-02-03;Porosity in welded seam;QE3C21;Customer complaint;After-sales repair;PRD-C309;BT260203C;LINE-03;SUP-C39;1;1;100,00;Major;2,10;1,20;EQ-C315;Night;Follow-up;Unit replaced and retested on site
+D0N5Q2T7W9A4;2026-02-18;Coating peeling from product housing;QF4D28;Warehouse sampling;Product recall;PRD-D412;BT260218D;LINE-01;SUP-D40;100;5;5,00;Major;0,48;0,30;EQ-D426;Day;Verified;Same batch isolated for inspection
+E1P6R3U8X0B5;2026-03-06;Poor contact at power connector;QG5E35;Production line;Scrap and remelt;PRD-E518;BT260306E;LINE-04;SUP-E51;150;12;8,00;Critical;3,70;2,00;EQ-E538;Swing;Verified;Contact resistance exceeds limit
+F2Q7S4V9Y1C6;2026-03-21;Excessive bearing rotation noise;QH6F42;Customer complaint;After-sales repair;PRD-F623;BT260321F;LINE-02;SUP-F62;1;1;100,00;Major;68,40;55,00;EQ-F649;Night;Follow-up;Normal operation after repair
+G3R8T5W0Z2D7;2026-04-09;Assembly dimension exceeds tolerance;QJ7G49;Warehouse sampling;Scrap and remelt;PRD-G734;BT260409G;LINE-03;SUP-G73;90;7;7,78;Critical;0,34;0,20;EQ-G752;Day;Verified;Repeat measurement remains out of tolerance
+H4S9U6X1A3E8;2026-04-27;Damaged moisture-proof package seal;QK8H56;Production line;Product recall;PRD-H845;BT260427H;LINE-04;SUP-H84;110;8;7,27;Major;4,20;2,50;EQ-H864;Swing;Verified;Entire batch placed on shipping hold
