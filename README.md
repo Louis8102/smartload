@@ -1,4 +1,4 @@
-# smartload V0.7.3
+# smartload V0.7.10
 
 `smartload` is an SSC-style Stata command. Its defining feature is path-free data loading: the user supplies a file name, and `smartload` finds and imports the file without requiring a drive letter, folder path, or cloud-sync location.
 
@@ -57,7 +57,7 @@ The standard Stata syntax uses a comma before options: `smartload filename.ext, 
 
 ## Search Behavior
 
-For local file names, V0.7.3 uses this order:
+For local file names, V0.7.10 uses this order:
 
 1. Use Everything through `es.exe` on Windows, when available.
 2. Search the saved `smartload_index.dta`, if it exists.
@@ -92,7 +92,7 @@ smartload, installes
 
 ## Supported Imports
 
-V0.7.3 imports Stata-readable data files and native document tables through Stata:
+V0.7.10 imports Stata-readable data files and native document tables through Stata:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
@@ -107,18 +107,32 @@ V0.7.3 imports Stata-readable data files and native document tables through Stat
 - `.dbf` via `import dbase`
 - local ESRI `.shp` plus its matching `.dbf` via `spshape2dta`
 - `.dct` fixed-format dictionaries via `infix using`
-- `.pdf` via StataNow `pdf2txt`, imported as plain text lines
+- `.pdf` via StataNow `pdf2txt`, with reconstruction of recoverably aligned text tables
 - `.docx` native Word tables through Office Open XML table extraction
 - `.pptx` native PowerPoint tables through Office Open XML table extraction
 - `.html`, `.htm`, `.asp`, `.aspx`, `.php`, `.jsp`, `.cfm`, and `.cgi` true HTML tables
 
-PDF support is plain-text support. It does not perform OCR and does not reconstruct PDF tables.
+PDF support reconstructs rectangular tables only when `pdf2txt` preserves recoverable column alignment. It joins text wrapped across physical PDF lines, including identifiers, dates, and ordinary text cells. It does not perform OCR; scanned, image-only, irregular, and heavily merged tables require a dedicated PDF or OCR tool.
+
+For the recognized multilevel blank salary-sheet template, `smartload` flattens the grouped deduction heading into `deduction_pf`, `deduction_tds`, and `deduction_gis`, labels all 13 variables, and returns zero observations. Visual blank rows are layout, not employee records, and are not fabricated as missing observations.
+
+For a recognized blank Weight/Height Record template, the repeated left and right panels are normalized to one long-form six-variable schema: `consumer_name`, `year`, `month`, `day`, `weight`, and `height`. The printed blank rows are not fabricated as observations.
+
+For a recognized multipage Disposal Schedule, each line-leading Ref identifier becomes one observation. Repeated page headers and page numbers are removed, wrapped cells are joined, and the reconstructed variables are `section`, `ref`, `record_type`, `minimum_retention_period`, `relevant_legislation`, and `final_action`.
+
+For a recognized PHQ-9/GAD-7 form, `smartload` creates a 16-observation question-bank dataset containing the instrument, item number, question, and four score labels. Blank circles are not fabricated as patient responses.
+
+For a recognized regional honors-list PDF, `smartload` creates `region`, `name`, and `capacity`. Region headings are carried down, wide name/capacity gaps define the columns, wrapped capacity descriptions are joined, and spaces used only for Chinese name typography are removed.
+
+For a recognized annual financial-report PDF containing the six primary statements, `table(1)` through `table(6)` select the statement of financial position, financial performance, changes in net assets, cash flows, budget-to-actual income, or budget-to-actual expenditure. Each statement receives its own schema so notes, year columns, reserve columns, program numbers, wrapped program names, negative amounts, and missing amounts are not shifted into the wrong fields. Without `table(#)`, `smartload` displays the six choices.
+
+For a recognized PDF containing consecutively numbered sample tables, use `table(#)` to select one table. Without `table(#)`, `smartload` lists all available numbered tables. A selected table is imported only when its extracted text can be reconstructed safely as a rectangle; examples built from merged cells, simulated columns, graphic symbols, or irregular headings may be rejected rather than silently misaligned.
 
 DOCX and PPTX support reads native Office table objects, including numeric cells, text cells, dates stored as text, and mixed textual content. It does not require every cell to be numeric. If one native table is present, it is selected automatically. If several tables are present, `smartload` lists numbered previews and asks which table to import; `table(#)` selects one directly. Use `firstrow` when the first table row contains variable names.
 
 Pictures, screenshots, scanned tables, charts, and ordinary document text are not treated as native tables. Legacy binary `.doc` and `.ppt` files must first be saved as `.docx` or `.pptx`; merely renaming the extension does not convert the file.
 
-For an ESRI shapefile, keep `map.shp` and `map.dbf` together. `smartload map.shp, clear` creates persistent `map_smartload.dta` and `map_smartload_shp.dta` files in Stata's current working directory and loads the first one as an `spset` dataset. If that name belongs to another source path, a numeric suffix is added automatically. Existing translated files from the same source are reused for speed. Use `smartload map.shp, clear replace` after the source shapefile changes. Other companion files such as `.shx` and `.prj` may remain in the source folder, but Stata's native translator requires the `.shp` and `.dbf` pair.
+For an ESRI shapefile, keep the same-name companion files together. The geometry `.shp` and attribute `.dbf` pair is the minimum required by Stata's native translator; `.shx` supplies the spatial-record index and `.prj` records the coordinate reference system for interoperability with GIS software. `smartload map.shp, clear` creates persistent `map_smartload.dta` and `map_smartload_shp.dta` files in Stata's current working directory and loads the first one as an `spset` dataset. If that name belongs to another source path, a numeric suffix is added automatically. Existing translated files from the same source are reused for speed. Use `smartload map.shp, clear replace` after the source shapefile changes.
 
 ## URLs and Cloud Folders
 
@@ -157,7 +171,7 @@ smartload/
   test_smartload.do
 ```
 
-The repository includes an `example_data` directory so a reader can download it and try `smartload` immediately. `net get smartload` copies the same ancillary files into Stata's current working directory. The non-geospatial files all contain the same ASCII-only product-quality dataset: 8 observations and 20 variables. The examples cover DTA, CSV, CSV2, DAT, TXT, TSV, Excel, SPSS, SAS, Parquet, DBF, PDF, HTML, DOCX, and PPTX. The Word and PowerPoint files each contain one native editable table with black cell borders; they are not screenshots. The ESRI shapefile example is necessarily a separate spatial dataset and includes a same-name `.shp` and `.dbf` pair.
+The repository includes an `example_data` directory so a reader can download it and try `smartload` immediately. `net get smartload` copies the same ancillary files into Stata's current working directory. The non-geospatial files all contain the same ASCII-only product-quality dataset: 8 observations and 20 variables. The examples cover DTA, CSV, CSV2, DAT, TXT, TSV, Excel, SPSS, SAS, Parquet, DBF, PDF, HTML, DOCX, and PPTX. The Word and PowerPoint files each contain one native editable table with black cell borders; they are not screenshots. The ESRI shapefile example is necessarily a separate spatial dataset: it contains eight major U.S. city points with plausible WGS 84 longitude/latitude coordinates and city, state, region, and site identifiers. Its same-name `.shp`, `.dbf`, `.shx`, and `.prj` components are all included.
 
 ```stata
 smartload smartload_example.dta, clear
@@ -173,11 +187,11 @@ smartload smartload_example.docx, table(1) firstrow clear
 smartload smartload_example.pptx, table(1) firstrow clear
 ```
 
-The self-test creates temporary fixtures and copies the packaged shapefile pair into its temporary workspace before testing. Public URL examples remain network-dependent and are not treated as mandatory offline tests.
+The self-test creates temporary fixtures and copies the packaged shapefile components into its temporary workspace before testing. Public URL examples remain network-dependent and are not treated as mandatory offline tests.
 
 ## Version
 
-- Version: 0.7.3
+- Version: 0.7.10
 - Date: 2026-07-14
 - Author: Hao Ma
 - License: MIT

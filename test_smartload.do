@@ -34,12 +34,18 @@ file close fh
 
 confirm file "example_data/smartload_example_map.shp"
 confirm file "example_data/smartload_example_map.dbf"
+confirm file "example_data/smartload_example_map.shx"
+confirm file "example_data/smartload_example_map.prj"
 copy "example_data/smartload_example_map.shp" "`base'/root1/smartload_geo_selftest.shp", replace
 copy "example_data/smartload_example_map.dbf" "`base'/root1/smartload_geo_selftest.dbf", replace
+copy "example_data/smartload_example_map.shx" "`base'/root1/smartload_geo_selftest.shx", replace
+copy "example_data/smartload_example_map.prj" "`base'/root1/smartload_geo_selftest.prj", replace
 confirm file "example_data/smartload_example.docx"
 confirm file "example_data/smartload_example.pptx"
+confirm file "example_data/smartload_example.pdf"
 copy "example_data/smartload_example.docx" "`base'/root1/smartload_quality_office_test.docx", replace
 copy "example_data/smartload_example.pptx" "`base'/root1/smartload_quality_office_test.pptx", replace
+copy "example_data/smartload_example.pdf" "`base'/root1/smartload_pdf_table_test.pdf", replace
 file open fh using "`base'\root1\sample.psv", write text replace
 file write fh "id|value|name" _n
 file write fh "1|10|row1" _n
@@ -62,13 +68,6 @@ local zsav_rc = _rc
 copy "`base'\root1\sample.csv" "`base'\root2\sample.csv", replace
 copy "`base'\root1\sample.dta" "`base'\root2\sample.dta", replace
 copy "`base'\root1\sample.dta" "`base'\root1\Customer Delight Data_Master.dta", replace
-
-putpdf begin
-putpdf paragraph
-putpdf text ("smartload pdf text test")
-putpdf paragraph
-putpdf text ("line two")
-putpdf save "`base'\root1\report.pdf", replace
 
 file open fh using "`base'\root1\web_tables.html", write text replace
 file write fh `"<html><body><h1>tables</h1><table><tr><th>id</th><th>score</th></tr><tr><td>1</td><td>10</td></tr><tr><td>2</td><td>20</td></tr></table><table><tr><th>city</th><th>value</th></tr><tr><td>Austin</td><td>7</td></tr></table></body></html>"'
@@ -214,18 +213,18 @@ di as txt "9d. ESRI shapefile pair translates, loads, and remains spset"
 loc before_geo_pwd `"`c(pwd)'"'
 quietly cd "`base'"
 smartload smartload_geo_selftest.shp, roots("`base'/root1") maxdirs(20) clear replace
-assert r(N) == 3
-assert r(k) == 5
+assert r(N) == 8
+assert r(k) == 9
 assert "`r(extension)'" == "shp"
 assert "`r(importcmd)'" == "spshape2dta + use"
 confirm file "`r(spatialdata)'"
 confirm file "`r(shapefile)'"
 spset
-assert name[1] == "Alpha"
-assert value[3] == 30
+assert CITY[1] == "Houston"
+assert abs(LONGITUDE[1] - (-95.3698)) < .000001
 smartload smartload_geo_selftest.shp, roots("`base'/root1") maxdirs(20) clear
-assert r(N) == 3
-assert name[2] == "Beta"
+assert r(N) == 8
+assert CITY[2] == "Chicago"
 quietly cd `"`before_geo_pwd'"'
 
 di as txt "10. log output exists"
@@ -253,16 +252,18 @@ smartload Customer Delight Data_Master.dta clear
 assert r(N) == 5
 assert "`r(filename)'" == "Customer Delight Data_Master.dta"
 
-di as txt "16. PDF is converted with pdf2txt and imported as plain text"
-smartload report.pdf, clear
-assert "`r(importcmd)'" == "pdf2txt + text import"
-assert r(k) == 2
-assert r(N) >= 1
-capture assert strpos(text[1], "smartload") > 0
-if _rc {
-    qui count if strpos(text, "smartload") > 0
-    assert r(N) > 0
-}
+di as txt "16. aligned text-based PDF table is reconstructed"
+smartload smartload_pdf_table_test.pdf, clear
+assert "`r(importcmd)'" == "pdf2txt + aligned table reconstruction"
+assert r(k) == 20
+assert r(N) == 8
+assert inspect_id[1] == "A7K2M9Q4T6X1"
+assert check_date[1] == "2026-01-05"
+assert issue[1] == "Seal ring does not close tightly"
+assert check_mode[1] == "Warehouse sampling"
+assert remarks[2] == "Crack length exceeds acceptance limit"
+assert remarks[7] == "Repeat measurement remains out of tolerance"
+assert issue[8] == "Damaged moisture-proof package seal"
 
 di as txt "7b. .csv2 semicolon and comma-decimal import succeeds"
 smartload sample.csv2, firstrow clear
@@ -398,8 +399,9 @@ di as txt "Private smartload helper programs are intentionally not called direct
 cap noi smartload "https://docs.google.com/presentation/d/abc123/edit", table(1) clear
 assert _rc != 198
 
-di as result "All runnable smartload V0.7.3 tests completed."
+di as result "All runnable smartload V0.7.10 tests completed."
 log close smartload_selftest
+exit, clear
 
 
 

@@ -1,12 +1,12 @@
 v 3
 d smartload: find a named data file and load it into Stata
-d Version: 0.7.3
+d Version: 0.7.10
 d
 d smartload loads data files by file name without requiring the folder path.
 d On Windows, it uses Everything's es.exe command-line interface when available for fast file search.
 d It imports DTA, Excel, CSV/CSV2/PSV/TSV/TAB/text, SPSS SAV/ZSAV/POR, SAS, XPT/V8XPT, Parquet, DBF, and DCT dictionaries using native Stata commands.
 d It translates local ESRI shapefile pairs (.shp plus matching .dbf) with Stata's native spshape2dta command.
-d It converts PDF files to plain text with StataNow pdf2txt when available, then imports the text lines.
+d It reconstructs aligned and selected multi-table PDFs, six-statement financial reports, recognized blank schemas, PHQ-9/GAD-7, regional honors lists, and a multipage Disposal Schedule with StataNow pdf2txt; it does not perform OCR.
 d It extracts native DOCX Word tables and PPTX PowerPoint tables, including numeric and text cells.
 d It extracts true HTML tables and escaped table code examples from local HTML files and web-page URLs.
 d Public Google Sheets links are converted to CSV export URLs; public Google Docs links are converted to HTML export URLs.
@@ -49,4 +49,6 @@ f example_data/smartload_example.html
 f example_data/smartload_example.docx
 f example_data/smartload_example.pptx
 f example_data/smartload_example_map.dbf
+f example_data/smartload_example_map.prj
 f example_data/smartload_example_map.shp
+f example_data/smartload_example_map.shx

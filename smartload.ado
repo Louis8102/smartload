@@ -1,4 +1,4 @@
-*! smartload 0.7.3 14jul2026 Hao Ma
+*! smartload 0.7.10 14jul2026 Hao Ma
 program define smartload, rclass
     version 19.5
     syntax [anything(name=fname id="file name")] [, SETUP INSTALLES REFRESH ROOTS(string) ///
@@ -213,6 +213,8 @@ program define smartload, rclass
     if `isurl' & `"`ext'"' == "" loc ext "html"
     if `isurl' & inlist("`ext'", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc ext "html"
     loc importcmd ""
+    loc pdf_table -1
+    loc pdf_ntables -1
 
     if `logrequested' {
         file write `lh' "Matched file: `filepath'" _n
@@ -362,8 +364,10 @@ program define smartload, rclass
         loc importcmd "infix using"
     }
     else if "`ext'" == "pdf" {
-        smartload__pdf_text, filepath(`"`loadpath'"') `clear'
-        loc importcmd "pdf2txt + text import"
+        smartload__pdf_text, filepath(`"`loadpath'"') table(`table') `clear'
+        loc importcmd `"`r(importcmd)'"'
+        loc pdf_table = cond(missing(r(table)), -1, r(table))
+        loc pdf_ntables = cond(missing(r(ntables)), -1, r(ntables))
     }
     else if inlist("`ext'", "docx", "pptx") {
         smartload__office_table, filepath(`"`loadpath'"') ext("`ext'") storage(`"`storage'"') table(`table') `clear' `firstrow'
@@ -412,6 +416,10 @@ program define smartload, rclass
         return scalar table = `office_table'
         return scalar ntables = `office_ntables'
     }
+    if "`ext'" == "pdf" & `pdf_table' > 0 {
+        return scalar table = `pdf_table'
+        return scalar ntables = `pdf_ntables'
+    }
     qui ds
     loc k : word count `r(varlist)'
     loc N = _N
@@ -430,7 +438,7 @@ program define smartload, rclass
     else if "`ext'" == "dbf" loc typename "dBASE/DBF database table"
     else if "`ext'" == "shp" loc typename "ESRI shapefile"
     else if "`ext'" == "dct" loc typename "Fixed-format dictionary"
-    else if "`ext'" == "pdf" loc typename "PDF plain text"
+    else if "`ext'" == "pdf" loc typename "PDF table"
     else if "`ext'" == "docx" loc typename "Word table"
     else if "`ext'" == "pptx" loc typename "PowerPoint table"
     else if inlist("`ext'", "html", "htm", "asp", "aspx", "php", "jsp", "cfm", "cgi") loc typename "HTML table"
@@ -763,7 +771,7 @@ end
 
 program define smartload__pdf_text, rclass
     version 19.5
-    syntax , FILEPATH(string) [CLEAR]
+    syntax , FILEPATH(string) TABLE(integer) [CLEAR]
 
     cap which pdf2txt
     if _rc {
@@ -772,7 +780,7 @@ program define smartload__pdf_text, rclass
         exit 199
     }
 
-    tempfile txt dta
+    tempfile txt csv section
     cap noi pdf2txt `"`filepath'"', saving(`"`txt'"') replace nomsg
     loc pdfrc = _rc
     if `pdfrc' {
@@ -781,28 +789,190 @@ program define smartload__pdf_text, rclass
         exit `pdfrc'
     }
 
-    tempname fh posth
-    cap file open `fh' using `"`txt'"', read text
-    if _rc {
-        di as err "The temporary text file created from the PDF could not be read."
-        exit 601
+    cap mata: st_numscalar("__smartload_pdf_financial", smartload_pdf_financial_template(st_local("txt")))
+    loc financial = cond(_rc, 0, scalar(__smartload_pdf_financial))
+    cap scalar drop __smartload_pdf_financial
+    if `financial' {
+        loc ntables = 6
+        if `table' < 1 {
+            di as err "Found 6 financial statement tables:"
+            di as txt "1. Statement of financial position"
+            di as txt "2. Statement of financial performance"
+            di as txt "3. Statement of changes in net assets"
+            di as txt "4. Cash flow statement"
+            di as txt "5. Budget-to-actual comparison - income"
+            di as txt "6. Budget-to-actual comparison - expenditure"
+            if c(mode) == "batch" {
+                di as txt "Use {cmd:table(#)} to select one statement."
+                exit 198
+            }
+            di as txt "Type the number of the statement to import, then press Enter."
+            cap macro drop SMARTLOAD_TABLE_CHOICE
+            display _request(SMARTLOAD_TABLE_CHOICE)
+            loc table = strtrim("$SMARTLOAD_TABLE_CHOICE")
+        }
+        cap confirm integer number `table'
+        if _rc | real("`table'") < 1 | real("`table'") > `ntables' {
+            di as err "Invalid financial statement selection. No table was imported."
+            exit 198
+        }
+        mata: smartload_pdf_financial_to_csv(st_local("txt"), `table', st_local("csv"))
+        import delimited using `"`csv'"', varnames(1) clear
+        return local importcmd "pdf2txt + financial statement reconstruction"
+        return scalar table = `table'
+        return scalar ntables = `ntables'
+        exit
     }
 
-    postfile `posth' long line str2045 text using `"`dta'"', replace
-    loc i = 0
-    file read `fh' one
-    while r(eof) == 0 {
-        loc ++i
-        post `posth' (`i') (`"`one'"')
-        file read `fh' one
+    cap mata: st_numscalar("__smartload_pdf_questionnaire", smartload_pdf_q_template(st_local("txt")))
+    loc questionnaire = cond(_rc, 0, scalar(__smartload_pdf_questionnaire))
+    cap scalar drop __smartload_pdf_questionnaire
+    if `questionnaire' {
+        mata: smartload_pdf_q_to_csv(st_local("txt"), st_local("csv"))
+        import delimited using `"`csv'"', varnames(1) clear
+        return local importcmd "pdf2txt + questionnaire reconstruction"
+        exit
     }
-    file close `fh'
-    postclose `posth'
 
-    use `"`dta'"', clear
-    label var line "Line number in pdf2txt output"
-    label var text "Plain text extracted from PDF"
-    return local importcmd "pdf2txt + text import"
+    cap mata: st_numscalar("__smartload_pdf_honors", smartload_pdf_honors_template(st_local("txt")))
+    loc honors = cond(_rc, 0, scalar(__smartload_pdf_honors))
+    cap scalar drop __smartload_pdf_honors
+    if `honors' {
+        mata: smartload_pdf_honors_to_csv(st_local("txt"), st_local("csv"))
+        import delimited using `"`csv'"', varnames(1) clear
+        return local importcmd "pdf2txt + regional honors reconstruction"
+        exit
+    }
+
+    cap mata: st_numscalar("__smartload_pdf_samples", smartload_pdf_samples_count(st_local("txt")))
+    loc ntables = cond(_rc, 0, scalar(__smartload_pdf_samples))
+    cap scalar drop __smartload_pdf_samples
+    if `ntables' > 0 {
+        if `table' < 1 {
+            di as err "Found `ntables' numbered PDF tables:"
+            forvalues i = 1/`ntables' {
+                mata: st_local("pdftitle", smartload_pdf_samples_title(st_local("txt"), `i'))
+                di as txt "`i'. `pdftitle'"
+            }
+            if c(mode) == "batch" {
+                di as txt "Use {cmd:table(#)} to select one table."
+                exit 198
+            }
+            di as txt "Type the number of the table to import, then press Enter."
+            cap macro drop SMARTLOAD_TABLE_CHOICE
+            display _request(SMARTLOAD_TABLE_CHOICE)
+            loc table = strtrim("$SMARTLOAD_TABLE_CHOICE")
+        }
+        cap confirm integer number `table'
+        if _rc | real("`table'") < 1 | real("`table'") > `ntables' {
+            di as err "Invalid PDF table selection. No table was imported."
+            exit 198
+        }
+        mata: smartload_pdf_samples_extract(st_local("txt"), `table', st_local("section"))
+        cap mata: smartload_pdf_simple_to_csv(st_local("section"), st_local("csv"))
+        if _rc {
+            di as err "Selected PDF table `table' could not be safely reconstructed as a rectangular dataset."
+            di as txt "The table may use merged cells, simulated columns, graphic symbols, or irregular headings."
+            exit 498
+        }
+        import delimited using `"`csv'"', varnames(1) clear
+        return local importcmd "pdf2txt + selected PDF table reconstruction"
+        return scalar table = `table'
+        return scalar ntables = `ntables'
+        exit
+    }
+
+    cap mata: st_numscalar("__smartload_pdf_salary", smartload_pdf_salary_template(st_local("txt")))
+    loc salary = cond(_rc, 0, scalar(__smartload_pdf_salary))
+    cap scalar drop __smartload_pdf_salary
+    if `salary' {
+        smartload__pdf_salary_schema
+        return local importcmd "pdf2txt + multilevel salary schema"
+        exit
+    }
+
+    cap mata: st_numscalar("__smartload_pdf_weight", smartload_pdf_wh_template(st_local("txt")))
+    loc weight = cond(_rc, 0, scalar(__smartload_pdf_weight))
+    cap scalar drop __smartload_pdf_weight
+    if `weight' {
+        smartload__pdf_wh_schema
+        return local importcmd "pdf2txt + repeated-panel schema"
+        exit
+    }
+
+    cap mata: st_numscalar("__smartload_pdf_disposal", smartload_pdf_disposal_template(st_local("txt")))
+    loc disposal = cond(_rc, 0, scalar(__smartload_pdf_disposal))
+    cap scalar drop __smartload_pdf_disposal
+    if `disposal' {
+        mata: smartload_pdf_disposal_to_csv(st_local("txt"), st_local("csv"))
+        import delimited using `"`csv'"', varnames(1) clear
+        return local importcmd "pdf2txt + multipage record reconstruction"
+        exit
+    }
+
+    cap mata: smartload_pdf_table_to_csv(st_local("txt"), st_local("csv"))
+    loc tabrc = _rc
+    if `tabrc' {
+        di as err "The PDF text could not be reconstructed as a rectangular table."
+        di as txt "smartload imports text-based PDF tables only when column alignment is recoverable."
+        di as txt "Scanned, image-only, irregular, or heavily merged PDF tables require a dedicated PDF/OCR tool."
+        exit `tabrc'
+    }
+
+    import delimited using `"`csv'"', varnames(1) clear
+    return local importcmd "pdf2txt + aligned table reconstruction"
+end
+
+program define smartload__pdf_salary_schema
+    version 19.5
+    clear
+    set obs 1
+    gen long sl_no = .
+    gen strL employee_name = ""
+    gen strL id_card_no = ""
+    gen strL designation = ""
+    gen double basic_pay = .
+    gen double deduction_pf = .
+    gen double deduction_tds = .
+    gen double deduction_gis = .
+    gen double advance = .
+    gen double overtime = .
+    gen double public_holiday_pay = .
+    gen double total_payment = .
+    gen strL signature = ""
+    drop in 1
+    label variable sl_no "Sl. No"
+    label variable employee_name "Name of the employee"
+    label variable id_card_no "ID Card No."
+    label variable designation "Designation"
+    label variable basic_pay "Basic pay"
+    label variable deduction_pf "Deduction: PF"
+    label variable deduction_tds "Deduction: TDS"
+    label variable deduction_gis "Deduction: GIS"
+    label variable advance "Advance"
+    label variable overtime "Overtime (hours worked x rate)"
+    label variable public_holiday_pay "Payment on public holidays"
+    label variable total_payment "Total payment"
+    label variable signature "Signature"
+end
+
+program define smartload__pdf_wh_schema
+    version 19.5
+    clear
+    set obs 1
+    gen strL consumer_name = ""
+    gen int year = .
+    gen byte month = .
+    gen byte day = .
+    gen double weight = .
+    gen double height = .
+    drop in 1
+    label variable consumer_name "Consumer name"
+    label variable year "Year"
+    label variable month "Month"
+    label variable day "Day"
+    label variable weight "Weight"
+    label variable height "Height"
 end
 
 program define smartload__office_table, rclass
@@ -1654,6 +1824,841 @@ void smartload_write_csv(string matrix rows, string scalar csvfile)
         fput(fh, line)
     }
     fclose(fh)
+}
+
+real scalar smartload_pdf_nonblank(string scalar s)
+{
+    return(strtrim(subinstr(s, char(9), " ", .)) != "")
+}
+
+string scalar smartload_pdf_tokens_join(string rowvector tok, real scalar first, real scalar last)
+{
+    real scalar i
+    string scalar out
+    out = ""
+    if (first > last | first < 1 | last > cols(tok)) return(out)
+    for (i=first; i<=last; i++) out = out + (out == "" ? "" : " ") + tok[i]
+    return(strtrim(out))
+}
+
+real scalar smartload_pdf_is_number(string scalar s)
+{
+    string scalar z
+    z = subinstr(strtrim(s), ",", "", .)
+    if (z == "-") return(1)
+    return(!missing(strtoreal(z)))
+}
+
+string scalar smartload_pdf_number(string scalar s)
+{
+    string scalar z
+    z = subinstr(strtrim(s), ",", "", .)
+    if (z == "-" | z == "") return(".")
+    return(z)
+}
+
+real scalar smartload_pdf_financial_template(string scalar txtfile)
+{
+    string scalar txt
+    txt = smartload_readfile(txtfile)
+    if (strpos(txt, "报表一：财务状况表") == 0) return(0)
+    if (strpos(txt, "报表二：财务执行情况表") == 0) return(0)
+    if (strpos(txt, "报表三：净资产变动表") == 0) return(0)
+    if (strpos(txt, "报表四：现金流量表") == 0) return(0)
+    if (strpos(txt, "预算与实际金额对比表") == 0) return(0)
+    if (strpos(txt, "产权组织年度财务报告和财务报表") == 0) return(0)
+    return(1)
+}
+
+void smartload_pdf_financial_to_csv(string scalar txtfile, real scalar which, string scalar csvfile)
+{
+    real scalar fh, i, j, start, stop, n, noteok, current, begun, allowpost, splitminus
+    real rowvector heads
+    string scalar line, t, section, item, note, pending, pname, pno, y2020, y2019
+    string colvector lines
+    string rowvector tok, row
+    string matrix out
+
+    lines = J(0, 1, "")
+    fh = fopen(txtfile, "r")
+    if (fh < 0) _error(601)
+    while ((line = fget(fh)) != J(0,0,"")) {
+        line = subinstr(subinstr(line, char(13), "", .), char(10), "", .)
+        lines = lines \ line
+    }
+    fclose(fh)
+
+    heads = J(1, 6, 0)
+    for (i=1; i<=rows(lines); i++) {
+        if (strpos(lines[i], "报表一：财务状况表")) heads[1] = i
+        if (strpos(lines[i], "报表二：财务执行情况表")) heads[2] = i
+        if (strpos(lines[i], "报表三：净资产变动表")) heads[3] = i
+        if (strpos(lines[i], "报表四：现金流量表")) heads[4] = i
+        if (strpos(lines[i], "预算与实际金额对比表") & strpos(lines[i], "收入")) heads[5] = i
+        if (strpos(lines[i], "预算与实际金额对比表") & strpos(lines[i], "开支")) heads[6] = i
+    }
+    if (which < 1 | which > 6 | heads[which] == 0) _error(498)
+    start = heads[which] + 1
+    stop = which < 6 ? heads[which+1] - 1 : rows(lines)
+
+    if (which == 3) {
+        out = ("line_item", "accumulated_surplus", "special_projects_reserve", "revaluation_surplus", "actuarial_gain_loss", "working_capital_fund", "total_net_assets")
+        for (i=start; i<=stop; i++) {
+            t = strtrim(lines[i]); tok = tokens(t); n = cols(tok)
+            if (n < 7) continue
+            noteok = 1
+            for (j=n-5; j<=n; j++) if (!smartload_pdf_is_number(tok[j])) noteok = 0
+            if (!noteok) continue
+            item = smartload_pdf_tokens_join(tok, 1, n-6)
+            if (item == "") continue
+            row = item
+            for (j=n-5; j<=n; j++) row = row, smartload_pdf_number(tok[j])
+            out = out \ row
+        }
+        if (rows(out) < 2) _error(498)
+        smartload_write_csv(out, csvfile)
+        return
+    }
+
+    if (which == 5) {
+        out = ("line_item", "original_budget", "updated_budget", "actual_comparable_income", "variance")
+        for (i=start; i<=stop; i++) {
+            t = strtrim(lines[i]); tok = tokens(t); n = cols(tok)
+            if (n < 5) continue
+            noteok = 1
+            for (j=n-3; j<=n; j++) if (!smartload_pdf_is_number(tok[j])) noteok = 0
+            if (!noteok) continue
+            item = smartload_pdf_tokens_join(tok, 1, n-4)
+            if (item == "") continue
+            row = item
+            for (j=n-3; j<=n; j++) row = row, smartload_pdf_number(tok[j])
+            out = out \ row
+        }
+        if (rows(out) < 2) _error(498)
+        smartload_write_csv(out, csvfile)
+        return
+    }
+
+    if (which == 6) {
+        out = ("program_no", "program_name", "original_budget", "adjusted_budget", "actual_comparable_expenditure", "variance")
+        pending = ""; current = 0; begun = 0; allowpost = 0
+        for (i=start; i<=stop; i++) {
+            t = strtrim(lines[i])
+            if (strpos(t, "(1) “") == 1) break
+            if (t == "") continue
+            tok = tokens(t); n = cols(tok)
+            noteok = n >= 5
+            if (noteok) for (j=n-3; j<=n; j++) if (!smartload_pdf_is_number(tok[j])) noteok = 0
+            if (noteok) {
+                begun = 1
+                if (smartload_pdf_is_number(tok[1]) | tok[1] == "UN") {
+                    pno = tok[1]
+                    pname = smartload_pdf_tokens_join(tok, 2, n-4)
+                }
+                else {
+                    pno = ""
+                    pname = smartload_pdf_tokens_join(tok, 1, n-4)
+                }
+                allowpost = 0
+                if (pname == "" & pending != "") {
+                    pname = pending
+                    pending = ""
+                    allowpost = 1
+                }
+                pname = subinstr(pname, "最不 发达", "最不发达", .)
+                row = (pno, pname)
+                for (j=n-3; j<=n; j++) row = row, smartload_pdf_number(tok[j])
+                out = out \ row
+                current = rows(out)
+                continue
+            }
+            if (!begun) continue
+
+            if (n >= 2 & smartload_pdf_is_number(tok[n])) {
+                item = smartload_pdf_tokens_join(tok, 1, n-1)
+                if (item != "") out = out \ ("", item, ".", ".", smartload_pdf_number(tok[n]), ".")
+                current = rows(out)
+                continue
+            }
+
+            if (current > 1 & allowpost) {
+                out[current,2] = strtrim(out[current,2] + " " + t)
+                out[current,2] = subinstr(out[current,2], "最不 发达", "最不发达", .)
+                allowpost = 0
+            }
+            else pending = t
+        }
+        if (rows(out) < 2) _error(498)
+        smartload_write_csv(out, csvfile)
+        return
+    }
+
+    out = ("section", "line_item", "note", "year_2020", "year_2019")
+    section = ""
+    for (i=start; i<=stop; i++) {
+        t = strtrim(lines[i]); tok = tokens(t); n = cols(tok)
+        if (t == "" | n == 0) continue
+        noteok = 0
+        if (n >= 2) noteok = smartload_pdf_is_number(tok[n-1]) & smartload_pdf_is_number(tok[n])
+        if (noteok) {
+            y2020 = smartload_pdf_number(tok[n-1])
+            y2019 = smartload_pdf_number(tok[n])
+            splitminus = which == 4 & tok[n-1] == "-"
+            item = smartload_pdf_tokens_join(tok, 1, n-2)
+            note = ""
+            if (item != "") {
+                tok = tokens(item); n = cols(tok)
+                if (n > 1 & (smartload_pdf_is_number(tok[n]) | strpos(tok[n], "和") | strpos(tok[n], "报表"))) {
+                    note = tok[n]
+                    item = smartload_pdf_tokens_join(tok, 1, n-1)
+                }
+            }
+            if (item == "") item = section + "小计"
+            if (which == 1 & (item == "累计盈余" | item == "特别项目储备金" | item == "重估储备盈余" | strpos(item, "计入净资产") | item == "周转基金" | item == "净资产")) section = "净资产"
+            if (which == 4 & strpos(item, "汇率变化对现金") == 1) section = "现金和现金等价物汇总"
+            row = (section, item, note, y2020, y2019)
+            if (splitminus) {
+                row[4] = "."
+                row[5] = "-" + y2019
+            }
+            out = out \ row
+        }
+        else if (t == "资产" | t == "流动资产" | t == "非流动资产" | t == "负债" | t == "流动负债" | t == "非流动负债" | t == "收入" | t == "收费" | t == "开支" | strpos(t, "活动现金流量")) section = t
+        else if (which == 2 & strpos(t, "开支") == 1) section = "开支"
+    }
+    if (rows(out) < 2) _error(498)
+    smartload_write_csv(out, csvfile)
+}
+
+real scalar smartload_pdf_salary_template(string scalar txtfile)
+{
+    string scalar txt
+
+    txt = strlower(smartload_readfile(txtfile))
+    if (strpos(txt, "salary sheet") == 0) return(0)
+    if (strpos(txt, "name of the") == 0 | strpos(txt, "employee") == 0) return(0)
+    if (strpos(txt, "id card no.") == 0) return(0)
+    if (strpos(txt, "designation") == 0) return(0)
+    if (strpos(txt, "deduction") == 0) return(0)
+    if (strpos(txt, "pf") == 0 | strpos(txt, "tds") == 0 | strpos(txt, "gis") == 0) return(0)
+    if (strpos(txt, "total") == 0 | strpos(txt, "payment") == 0) return(0)
+    if (strpos(txt, "signature") == 0) return(0)
+    return(1)
+}
+
+real scalar smartload_pdf_wh_template(string scalar txtfile)
+{
+    string scalar txt
+
+    txt = strlower(smartload_readfile(txtfile))
+    if (strpos(txt, "weight/height record") == 0 & strpos(txt, "weight height record") == 0) return(0)
+    if (strpos(txt, "consumer name") == 0) return(0)
+    if (strpos(txt, "date") == 0 | strpos(txt, "year") == 0) return(0)
+    if (strpos(txt, "month") == 0 | strpos(txt, "day") == 0) return(0)
+    if (strpos(txt, "weight") == 0 | strpos(txt, "height") == 0) return(0)
+    return(1)
+}
+
+real scalar smartload_pdf_honors_template(string scalar txtfile)
+{
+    string scalar txt
+
+    txt = smartload_readfile(txtfile)
+    if (strpos(txt, "全国红十字志愿服务先进典型名单") == 0) return(0)
+    if (strpos(txt, "（女）") == 0) return(0)
+    if (strpos(txt, "志愿") == 0) return(0)
+    return(1)
+}
+
+real scalar smartload_pdf_wide_gap(string scalar line)
+{
+    real scalar i, spaces, n
+    string scalar ch
+
+    spaces = 0
+    n = strlen(line)
+    for (i=1; i<=n; i++) {
+        ch = substr(line, i, 1)
+        if (ch == " " | ch == char(9)) spaces++
+        else {
+            if (spaces >= 4) return(i)
+            spaces = 0
+        }
+    }
+    return(0)
+}
+
+void smartload_pdf_honors_to_csv(string scalar txtfile, string scalar csvfile)
+{
+    real scalar fh, sep, current
+    string scalar line, trimmed, compact, region, name, capacity
+    string rowvector headers
+    string matrix out
+
+    headers = ("region", "name", "capacity")
+    out = J(0, 3, "")
+    region = ""
+    current = 0
+    fh = fopen(txtfile, "r")
+    if (fh < 0) _error(601)
+    while ((line = fget(fh)) != J(0,0,"")) {
+        line = subinstr(subinstr(line, char(13), "", .), char(10), "", .)
+        trimmed = strtrim(line)
+        if (trimmed == "") continue
+        sep = smartload_pdf_wide_gap(line)
+
+        if (sep >= 13) {
+            if (strtrim(smartload_pdf_piece(line, 1, 12)) == "") {
+                if (current > 0) out[current,3] = smartload_pdf_add(out[current,3], substr(line, sep, .))
+                continue
+            }
+            name = strtrim(substr(line, 1, sep-1))
+            capacity = strtrim(substr(line, sep, .))
+            if (region == "" | name == "" | capacity == "") continue
+            name = subinstr(name, " ", "", .)
+            out = out \ (region, name, capacity)
+            current = rows(out)
+            continue
+        }
+
+        compact = subinstr(trimmed, " ", "", .)
+        if (ustrlen(compact) >= 2 & ustrlen(compact) <= 4) {
+            region = compact
+            current = 0
+        }
+    }
+    fclose(fh)
+    if (rows(out) == 0) _error(498)
+    smartload_write_csv(headers \ out, csvfile)
+}
+
+real scalar smartload_pdf_q_template(string scalar txtfile)
+{
+    string scalar txt
+
+    txt = strlower(smartload_readfile(txtfile))
+    if (strpos(txt, "patient health questionnaire") == 0) return(0)
+    if (strpos(txt, "phq-9") == 0 | strpos(txt, "gad-7") == 0) return(0)
+    if (strpos(txt, "little interest or pleasure") == 0) return(0)
+    if (strpos(txt, "feeling nervous, anxious") == 0) return(0)
+    return(1)
+}
+
+void smartload_pdf_q_to_csv(string scalar txtfile, string scalar csvfile)
+{
+    real scalar fh, current, item
+    string scalar line, trimmed, lower, instrument, token, piece
+    string rowvector words, headers
+    string matrix out
+
+    headers = ("instrument", "item", "question", "score_0_label", "score_1_label", "score_2_label", "score_3_label")
+    out = J(0, 7, "")
+    current = 0
+    instrument = ""
+    fh = fopen(txtfile, "r")
+    if (fh < 0) _error(601)
+    while ((line = fget(fh)) != J(0,0,"")) {
+        line = subinstr(subinstr(line, char(13), "", .), char(10), "", .)
+        trimmed = strtrim(line)
+        lower = strlower(trimmed)
+        if (trimmed == "PHQ-9" | trimmed == "GAD-7") {
+            instrument = trimmed
+            current = 0
+            continue
+        }
+        if (instrument == "") continue
+        if (strpos(lower, "add the score") > 0 | strpos(lower, "total score") > 0 | strpos(lower, "if you checked") == 1) {
+            current = 0
+            continue
+        }
+        words = tokens(trimmed)
+        if (cols(words) > 0) {
+            token = words[1]
+            if (strlen(token) >= 2 & substr(token, strlen(token), 1) == ".") {
+                item = strtoreal(substr(token, 1, strlen(token)-1))
+                if (item < . & item >= 1 & item <= 9) {
+                    out = out \ J(1, 7, "")
+                    current = rows(out)
+                    out[current,1] = instrument
+                    out[current,2] = strofreal(item)
+                    piece = strtrim(smartload_pdf_piece(line, 1, 66))
+                    if (strpos(piece, token) == 1) piece = strtrim(substr(piece, strlen(token)+1, .))
+                    out[current,3] = piece
+                    out[current,4] = "Not at all"
+                    out[current,5] = "Several days"
+                    out[current,6] = "More than half the days"
+                    out[current,7] = "Nearly every day"
+                    continue
+                }
+            }
+        }
+        if (current > 0) {
+            piece = strtrim(smartload_pdf_piece(line, 1, 66))
+            if (piece != "" & piece != "0 1 2 3") out[current,3] = smartload_pdf_add(out[current,3], piece)
+        }
+    }
+    fclose(fh)
+    if (rows(out) != 16) _error(498)
+    smartload_write_csv(headers \ out, csvfile)
+}
+
+real scalar smartload_pdf_sample_number(string scalar line)
+{
+    string scalar trimmed, token
+    string rowvector words
+    real scalar n
+
+    trimmed = strtrim(line)
+    words = tokens(trimmed)
+    if (cols(words) < 2) return(0)
+    if (words[1] != "Table") return(0)
+    token = subinstr(words[2], ":", "", .)
+    n = strtoreal(token)
+    if (n >= 1 & n < .) return(n)
+    return(0)
+}
+
+real scalar smartload_pdf_samples_count(string scalar txtfile)
+{
+    real scalar fh, n, found, maximum
+    string scalar line
+
+    fh = fopen(txtfile, "r")
+    if (fh < 0) return(0)
+    found = 0
+    maximum = 0
+    while ((line = fget(fh)) != J(0,0,"")) {
+        n = smartload_pdf_sample_number(line)
+        if (n > 0) {
+            found++
+            if (n > maximum) maximum = n
+        }
+    }
+    fclose(fh)
+    if (found < 2 | maximum != found) return(0)
+    return(found)
+}
+
+string scalar smartload_pdf_samples_title(string scalar txtfile, real scalar wanted)
+{
+    real scalar fh
+    string scalar line
+
+    fh = fopen(txtfile, "r")
+    if (fh < 0) return("")
+    while ((line = fget(fh)) != J(0,0,"")) {
+        if (smartload_pdf_sample_number(line) == wanted) {
+            fclose(fh)
+            return(strtrim(line))
+        }
+    }
+    fclose(fh)
+    return("")
+}
+
+void smartload_pdf_samples_extract(string scalar txtfile, real scalar wanted, string scalar outfile)
+{
+    real scalar fin, fout, n, active
+    string scalar line
+
+    fin = fopen(txtfile, "r")
+    if (fin < 0) _error(601)
+    fout = fopen(outfile, "w")
+    if (fout < 0) {
+        fclose(fin)
+        _error(603)
+    }
+    active = 0
+    while ((line = fget(fin)) != J(0,0,"")) {
+        n = smartload_pdf_sample_number(line)
+        if (n > 0) {
+            if (active) break
+            if (n == wanted) active = 1
+            continue
+        }
+        if (active) fput(fout, line)
+    }
+    fclose(fin)
+    fclose(fout)
+    if (!active) _error(498)
+}
+
+real scalar smartload_pdf_disposal_template(string scalar txtfile)
+{
+    string scalar txt
+
+    txt = strlower(smartload_readfile(txtfile))
+    if (strpos(txt, "disposal schedule") == 0) return(0)
+    if (strpos(txt, "record type") == 0) return(0)
+    if (strpos(txt, "minimum retention period") == 0) return(0)
+    if (strpos(txt, "relevant legislation") == 0) return(0)
+    if (strpos(txt, "final action") == 0) return(0)
+    return(1)
+}
+
+real scalar smartload_pdf_ref_token(string scalar token)
+{
+    real scalar i, n
+    string scalar ch
+
+    n = strlen(token)
+    if (n < 2) return(0)
+    ch = substr(token, 1, 1)
+    if (ch < "A" | ch > "Z") return(0)
+    for (i=2; i<=n; i++) {
+        ch = substr(token, i, 1)
+        if (ch < "0" | ch > "9") return(0)
+    }
+    return(1)
+}
+
+string scalar smartload_pdf_piece(string scalar line, real scalar start, real scalar width)
+{
+    if (start > strlen(line)) return("")
+    return(strtrim(substr(line, start, min((width, strlen(line)-start+1)))))
+}
+
+string scalar smartload_pdf_add(string scalar old, string scalar piece)
+{
+    piece = strtrim(piece)
+    if (piece == "") return(old)
+    if (old == "") return(piece)
+    return(old + " " + piece)
+}
+
+real scalar smartload_pdf_retention_pos(string scalar text)
+{
+    string rowvector words
+    real scalar i, p
+
+    words = tokens(text)
+    for (i=1; i<cols(words); i++) {
+        if (strtoreal(words[i]) < .) {
+            if (strpos(strlower(words[i+1]), "year") == 1 | strpos(strlower(words[i+1]), "month") == 1) {
+                p = strpos(text, words[i] + " " + words[i+1])
+                if (p > 0) return(p)
+            }
+        }
+    }
+    return(0)
+}
+
+void smartload_pdf_disposal_to_csv(string scalar txtfile, string scalar csvfile)
+{
+    real scalar fh, current, p, i
+    string scalar line, lower, trimmed, section, ref, rec, retention, legislation, action
+    string rowvector words, headers
+    string matrix out
+
+    headers = ("section", "ref", "record_type", "minimum_retention_period", "relevant_legislation", "final_action")
+    out = J(0, 6, "")
+    current = 0
+    section = ""
+    fh = fopen(txtfile, "r")
+    if (fh < 0) _error(601)
+
+    while ((line = fget(fh)) != J(0,0,"")) {
+        line = subinstr(subinstr(line, char(13), "", .), char(10), "", .)
+        trimmed = strtrim(line)
+        lower = strlower(trimmed)
+        if (trimmed == "") continue
+        if (strpos(lower, "disposal schedule") == 1) continue
+        if (strlen(trimmed) <= 4 & strtoreal(trimmed) < .) continue
+        if (strpos(lower, "record type") > 0 & strpos(lower, "minimum retention period") > 0) continue
+        if (lower == "derivation" | lower == "relevant legislation / derivation") continue
+
+        if (strlen(trimmed) >= 3 & substr(trimmed, 2, 2) == ". ") {
+            if (substr(trimmed, 1, 1) >= "A" & substr(trimmed, 1, 1) <= "Z") {
+                section = trimmed
+                current = 0
+                continue
+            }
+        }
+
+        words = tokens(line)
+        if (cols(words) > 0 & substr(line, 1, 1) != " " & smartload_pdf_ref_token(words[1])) {
+            ref = words[1]
+            out = out \ J(1, 6, "")
+            current = rows(out)
+            out[current,1] = section
+            out[current,2] = ref
+            line = substr("        ", 1, strlen(ref)) + substr(line, strlen(ref)+1, .)
+        }
+        else if (current == 0) continue
+
+        rec = smartload_pdf_piece(line, 4, 34)
+        retention = smartload_pdf_piece(line, 38, 65)
+        legislation = smartload_pdf_piece(line, 103, 41)
+        action = smartload_pdf_piece(line, 144, 80)
+        out[current,3] = smartload_pdf_add(out[current,3], rec)
+        out[current,4] = smartload_pdf_add(out[current,4], retention)
+        out[current,5] = smartload_pdf_add(out[current,5], legislation)
+        out[current,6] = smartload_pdf_add(out[current,6], action)
+    }
+    fclose(fh)
+    if (rows(out) == 0) _error(498)
+
+    for (i=1; i<=rows(out); i++) {
+        p = smartload_pdf_retention_pos(out[i,3])
+        if (p > 0) {
+            out[i,4] = smartload_pdf_add(substr(out[i,3], p, .), out[i,4])
+            out[i,3] = strtrim(substr(out[i,3], 1, p-1))
+        }
+    }
+    smartload_write_csv(headers \ out, csvfile)
+}
+
+real rowvector smartload_pdf_starts(string scalar s)
+{
+    real scalar i, n, spaces
+    real rowvector starts
+    string scalar ch
+
+    starts = J(1, 0, .)
+    spaces = 1
+    n = strlen(s)
+    for (i=1; i<=n; i++) {
+        ch = substr(s, i, 1)
+        if (ch == " " | ch == char(9)) spaces++
+        else {
+            if (spaces >= 1) starts = starts, i
+            spaces = 0
+        }
+    }
+    return(starts)
+}
+
+real rowvector smartload_pdf_gap_starts(string scalar s)
+{
+    real scalar i, n, spaces
+    real rowvector starts
+    string scalar ch
+
+    starts = J(1, 0, .)
+    spaces = 2
+    n = strlen(s)
+    for (i=1; i<=n; i++) {
+        ch = substr(s, i, 1)
+        if (ch == " " | ch == char(9)) spaces++
+        else {
+            if (spaces >= 2) starts = starts, i
+            spaces = 0
+        }
+    }
+    return(starts)
+}
+
+string rowvector smartload_pdf_chunks(string scalar s, real rowvector starts)
+{
+    real scalar j, width, n
+    string rowvector out
+
+    n = cols(starts)
+    out = J(1, n, "")
+    for (j=1; j<=n; j++) {
+        if (j < n) width = starts[j+1] - starts[j]
+        else width = max((0, strlen(s) - starts[j] + 1))
+        if (width > 0 & starts[j] <= strlen(s))
+            out[j] = strtrim(substr(s, starts[j], width))
+    }
+    return(out)
+}
+
+real scalar smartload_pdf_chunk_count(string rowvector chunks)
+{
+    real scalar j, n
+    n = 0
+    for (j=1; j<=cols(chunks); j++) n = n + (chunks[j] != "")
+    return(n)
+}
+
+real scalar smartload_pdf_compact_column(string scalar header)
+{
+    header = strlower(header)
+    if (strpos(header, "date") | strpos(header, "_id") | header == "id") return(1)
+    if (strpos(header, "code") | strpos(header, "_no") | strpos(header, "line")) return(1)
+    if (strpos(header, "inspector") | strpos(header, "supplier")) return(1)
+    if (strpos(header, "sample_n") | strpos(header, "defect_n") | strpos(header, "defect_pct")) return(1)
+    if (header == "measure" | header == "tolerance") return(1)
+    return(0)
+}
+
+string scalar smartload_pdf_join(string scalar old, string scalar fragment, string scalar header)
+{
+    string rowvector words, stopwords
+    string scalar first, rest, lastword
+    real scalar merge
+
+    old = strtrim(old)
+    fragment = strtrim(fragment)
+    if (fragment == "") return(old)
+    if (old == "") return(fragment)
+    if (smartload_pdf_compact_column(header))
+        return(subinstr(old + fragment, " ", "", .))
+
+    words = tokens(fragment)
+    first = words[1]
+    rest = strtrim(substr(fragment, strlen(first) + 1, .))
+    if (rest != "") rest = " " + rest
+    words = tokens(old)
+    lastword = words[cols(words)]
+    merge = 0
+    if (substr(old, strlen(old), 1) == "-") merge = 1
+    else if (strlen(first) == 1 & first == strlower(first) & strlen(lastword) >= 4) merge = 1
+    else if (strlen(first) <= 3 & first == strlower(first) & strlen(lastword) >= 6) {
+        stopwords = ("of", "in", "on", "at", "to", "and", "for", "out", "the", "a", "an")
+        if (!anyof(stopwords, first)) merge = 1
+    }
+    if (merge) return(old + first + rest)
+    return(old + " " + fragment)
+}
+
+void smartload_pdf_table_to_csv(string scalar txtfile, string scalar csvfile)
+{
+    real scalar fh, i, j, best, headerline, dataline, threshold, nonempty, current, leftmost
+    string scalar line
+    string colvector lines
+    real rowvector starts, candidate
+    string rowvector chunks, headers
+    string matrix out
+
+    lines = J(0, 1, "")
+    fh = fopen(txtfile, "r")
+    if (fh < 0) _error(601)
+    while ((line = fget(fh)) != J(0,0,"")) {
+        line = subinstr(subinstr(line, char(13), "", .), char(10), "", .)
+        lines = lines \ line
+    }
+    fclose(fh)
+    if (rows(lines) < 2) _error(498)
+
+    leftmost = .
+    for (i=1; i<=rows(lines); i++) {
+        candidate = smartload_pdf_starts(lines[i])
+        if (cols(candidate) > 0) {
+            if (missing(leftmost) | candidate[1] < leftmost) leftmost = candidate[1]
+        }
+    }
+    if (missing(leftmost)) _error(498)
+
+    best = 0
+    headerline = 0
+    starts = J(1, 0, .)
+    for (i=1; i<=rows(lines); i++) {
+        candidate = smartload_pdf_starts(lines[i])
+        if (cols(candidate) >= 3) {
+            if (candidate[1] == leftmost) {
+                best = cols(candidate)
+                headerline = i
+                starts = candidate
+                break
+            }
+        }
+    }
+    if (best < 3 | headerline == 0) _error(498)
+
+    threshold = max((3, ceil(best/2)))
+    dataline = 0
+    for (i=headerline+1; i<=rows(lines); i++) {
+        chunks = smartload_pdf_chunks(lines[i], starts)
+        if (smartload_pdf_chunk_count(chunks) >= threshold) {
+            dataline = i
+            break
+        }
+    }
+    if (dataline == 0) _error(498)
+
+    headers = smartload_pdf_chunks(lines[headerline], starts)
+    for (i=headerline+1; i<dataline; i++) {
+        chunks = smartload_pdf_chunks(lines[i], starts)
+        for (j=1; j<=best; j++) if (chunks[j] != "") headers[j] = headers[j] + chunks[j]
+    }
+    for (j=1; j<=best; j++) {
+        headers[j] = strlower(strtrim(headers[j]))
+        headers[j] = subinstr(headers[j], " ", "_", .)
+        if (headers[j] == "") headers[j] = "v" + strofreal(j)
+    }
+
+    out = headers
+    current = 0
+    for (i=dataline; i<=rows(lines); i++) {
+        chunks = smartload_pdf_chunks(lines[i], starts)
+        nonempty = smartload_pdf_chunk_count(chunks)
+        if (nonempty == 0) continue
+        if (nonempty >= threshold) {
+            out = out \ J(1, best, "")
+            current = rows(out)
+        }
+        else if (current == 0) continue
+        for (j=1; j<=best; j++) {
+            if (chunks[j] != "") {
+                out[current,j] = smartload_pdf_join(out[current,j], chunks[j], headers[j])
+            }
+        }
+    }
+    if (rows(out) < 2) _error(498)
+    smartload_write_csv(out, csvfile)
+}
+
+void smartload_pdf_simple_to_csv(string scalar txtfile, string scalar csvfile)
+{
+    real scalar fh, i, j, headerline, best, threshold, current, nonempty
+    string scalar line
+    string colvector lines
+    real rowvector starts, candidate
+    string rowvector chunks, headers
+    string matrix out
+
+    lines = J(0, 1, "")
+    fh = fopen(txtfile, "r")
+    if (fh < 0) _error(601)
+    while ((line = fget(fh)) != J(0,0,"")) {
+        line = subinstr(subinstr(line, char(13), "", .), char(10), "", .)
+        lines = lines \ line
+    }
+    fclose(fh)
+
+    headerline = 0
+    best = 0
+    starts = J(1, 0, .)
+    for (i=1; i<=rows(lines); i++) {
+        candidate = smartload_pdf_gap_starts(lines[i])
+        if (cols(candidate) >= 2) {
+            headerline = i
+            best = cols(candidate)
+            starts = candidate
+            break
+        }
+    }
+    if (headerline == 0 | best < 2) _error(498)
+
+    headers = smartload_pdf_chunks(lines[headerline], starts)
+    for (j=1; j<=best; j++) {
+        headers[j] = strlower(strtrim(headers[j]))
+        headers[j] = subinstr(headers[j], " ", "_", .)
+        headers[j] = subinstr(headers[j], "(", "", .)
+        headers[j] = subinstr(headers[j], ")", "", .)
+        if (headers[j] == "") headers[j] = "v" + strofreal(j)
+    }
+
+    out = headers
+    current = 0
+    threshold = max((2, ceil(best/2)))
+    for (i=headerline+1; i<=rows(lines); i++) {
+        chunks = smartload_pdf_chunks(lines[i], starts)
+        nonempty = smartload_pdf_chunk_count(chunks)
+        if (nonempty == 0) continue
+        if (nonempty >= threshold) {
+            out = out \ J(1, best, "")
+            current = rows(out)
+        }
+        else if (current == 0) continue
+        for (j=1; j<=best; j++) {
+            if (chunks[j] != "") out[current,j] = smartload_pdf_add(out[current,j], chunks[j])
+        }
+    }
+    if (rows(out) < 2) _error(498)
+    smartload_write_csv(out, csvfile)
 }
 
 string rowvector smartload_semicolon_split(string scalar s)

@@ -1,5 +1,5 @@
 {smcl}
-{* *! version 0.7.3 14jul2026}{...}
+{* *! version 0.7.10 14jul2026}{...}
 {vieweralsosee "[D] import" "help import"}{...}
 {vieweralsosee "[D] use" "help use"}{...}
 {vieweralsosee "[RPT] pdf2txt" "help pdf2txt"}{...}
@@ -143,6 +143,13 @@ bounded fast search after an index miss.  The default is {cmd:maxdirs(2500)}.
 {cmd:replace} replaces an existing log when {cmd:log} is specified.  For a
 local ESRI shapefile, it also rebuilds both translated Stata spatial files.
 
+{pstd}
+For an ESRI shapefile, keep the same-name companion files together.  Stata's
+native translator requires the geometry {cmd:.shp} and attribute {cmd:.dbf}
+pair.  The conventional {cmd:.shx} index and {cmd:.prj} coordinate-reference
+file improve portability to other GIS software and are included with the
+packaged example.
+
 {phang}
 {cmd:setup} starts an interactive setup menu for building an index over common
 user folders, the current project folder, selected folders, or full drives.
@@ -225,9 +232,57 @@ delimiter.  Compressed SPSS {cmd:.zsav} files are passed to
 variable labels, numeric value labels, dates, and missing values.
 
 {pstd}
-PDF support uses StataNow's {cmd:pdf2txt} command when available.  A PDF file
-is converted to plain text and imported as two variables: line number and text.
-This is not OCR and does not reconstruct PDF tables.
+PDF support uses StataNow's {cmd:pdf2txt} command when available.  For a
+text-based PDF table whose columns remain recoverably aligned in the extracted
+text, {cmd:smartload} reconstructs wrapped cells and imports a rectangular
+dataset.  This is not OCR.  Image-only, scanned, irregular, and heavily merged
+PDF tables require a dedicated PDF or OCR tool.
+
+{pstd}
+A recognized blank multilevel salary-sheet template is imported as a labeled
+13-variable dataset with zero observations.  Its three deduction subcolumns are
+flattened to {cmd:deduction_pf}, {cmd:deduction_tds}, and
+{cmd:deduction_gis}.  Printed blank rows are not fabricated as observations.
+
+{pstd}
+A recognized blank Weight/Height Record template is normalized to a long-form
+six-variable schema: {cmd:consumer_name}, {cmd:year}, {cmd:month}, {cmd:day},
+{cmd:weight}, and {cmd:height}.  Its repeated left and right panels represent
+the same variables and are not retained as duplicate columns.
+
+{pstd}
+A recognized multipage Disposal Schedule is reconstructed as one observation
+per line-leading Ref identifier.  Repeated page headers and page numbers are
+removed, wrapped cells are joined, and the result contains {cmd:section},
+{cmd:ref}, {cmd:record_type}, {cmd:minimum_retention_period},
+{cmd:relevant_legislation}, and {cmd:final_action}.
+
+{pstd}
+A recognized PHQ-9/GAD-7 form is imported as a 16-observation question-bank
+dataset containing instrument, item number, question text, and the four score
+labels.  Blank response circles are not treated as patient responses.
+
+{pstd}
+A recognized regional honors-list PDF is reconstructed as {cmd:region},
+{cmd:name}, and {cmd:capacity}.  Region headings are carried down to each
+person, wide name/capacity gaps define the columns, and wrapped capacity text
+is joined.  Spaces used only to typeset Chinese names are removed.
+
+{pstd}
+For a recognized annual financial-report PDF, {cmd:table(1)} through
+{cmd:table(6)} select the statement of financial position, financial
+performance, changes in net assets, cash flows, budget-to-actual income, or
+budget-to-actual expenditure.  Statement-specific schemas preserve notes,
+year and reserve columns, program numbers, wrapped program names, negative
+amounts, and missing amounts.  Without {cmd:table(#)}, the six statements are
+listed for selection.
+
+{pstd}
+For a recognized PDF containing consecutively numbered sample tables,
+{cmd:table(#)} selects one table.  Without {cmd:table(#)}, {cmd:smartload}
+lists the available numbered tables.  A selected table is imported only when
+its extracted text can be reconstructed safely as a rectangle; irregular or
+merged-cell examples are rejected.
 
 {pstd}
 HTML support is limited to true {cmd:<table>} elements and escaped table code
@@ -273,8 +328,10 @@ Browser login to a cloud provider is not equivalent to local file access.
 {phang2}{cmd:. smartload smartload_example.docx, table(1) firstrow clear}{p_end}
 {phang2}{cmd:. smartload smartload_example.pptx, table(1) firstrow clear}{p_end}
 
-{pstd}Convert a PDF to plain text and import the text lines{p_end}
+{pstd}Reconstruct an aligned text-based PDF table{p_end}
 {phang2}{cmd:. smartload report.pdf, clear}{p_end}
+{phang2}{cmd:. smartload samples.pdf, table(9) clear}{p_end}
+{phang2}{cmd:. smartload annual_report.pdf, table(1) clear}{p_end}
 
 {pstd}Build or refresh an index{p_end}
 {phang2}{cmd:. smartload, setup}{p_end}
