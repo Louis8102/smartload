@@ -1,51 +1,52 @@
 v 3
 d smartload: find a named data file and load it into Stata
-d Version: 0.6.8
+d Version: 0.7.3
 d
 d smartload loads data files by file name without requiring the folder path.
-d It imports DTA, Excel, CSV/text, SPSS, SAS, XPT/V8XPT, Parquet, DBF, and DCT dictionaries using native Stata commands.
-d It experimentally extracts true Office tables from DOCX and PPTX files.
-d It experimentally extracts true HTML tables and escaped table code examples from local HTML files and web-page URLs.
+d On Windows, it uses Everything's es.exe command-line interface when available for fast file search.
+d It imports DTA, Excel, CSV/CSV2/PSV/TSV/TAB/text, SPSS SAV/ZSAV/POR, SAS, XPT/V8XPT, Parquet, DBF, and DCT dictionaries using native Stata commands.
+d It translates local ESRI shapefile pairs (.shp plus matching .dbf) with Stata's native spshape2dta command.
+d It converts PDF files to plain text with StataNow pdf2txt when available, then imports the text lines.
+d It extracts native DOCX Word tables and PPTX PowerPoint tables, including numeric and text cells.
+d It extracts true HTML tables and escaped table code examples from local HTML files and web-page URLs.
 d Public Google Sheets links are converted to CSV export URLs; public Google Docs links are converted to HTML export URLs.
+d Public Google Slides links are converted to PPTX export URLs and scanned for native tables.
 d Common server-page URLs such as .asp, .aspx, .php, .jsp, .cfm, and .cgi are treated as HTML pages.
 d Web-page URLs ending in a slash are treated as HTML pages.
-d Web-page URL downloads use Stata's native downloader for SSC-style portability.
-d On Windows, it can use Everything's es.exe command-line interface when available.
+d Web-page URL downloads use Stata's native downloader first and system curl as an optional fallback; PowerShell is not used.
 d It imports direct http/https data-file URLs and converts common GitHub blob URLs to raw URLs.
 d It supports locally synced cloud-drive folders such as OneDrive, Google Drive, Dropbox, Box, and SharePoint Sync.
 d Use smartload, installes to install es.exe into the user's PERSONAL ado folder.
-d It detects but does not automatically import R files, legacy DOC/PPT, PDF document tables, or image-only web tables.
+d It detects R and legacy DOC/PPT files but does not import them; DOCX and PPTX native tables are importable.
 d Use smartload, setup for a guided index setup.
 d Load by name with: smartload Indicator.dta, clear
 d
 d Author: Hao Ma
-d Distribution-Date: 20260711
+d Distribution-Date: 20260714
 d License: MIT
 d Requires: Stata 19.5
 d Install with: net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
+d Optional examples: net get smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
 d
 f smartload.ado
 f smartload.sthlp
 f test_smartload.do
 f README.md
 f LICENSE
-f example_data/smartload_example.dta
 f example_data/smartload_example.csv
-f example_data/smartload_example.xlsx
+f example_data/smartload_example.csv2
 f example_data/smartload_example.dat
-f example_data/smartload_example.sav
+f example_data/smartload_example.dta
+f example_data/smartload_example.txt
+f example_data/smartload_example.tsv
 f example_data/smartload_example.sas7bdat
-f example_data/smartload_example_manifest.dta
-f example_data/smartload_example_fixed.raw
-f example_data/smartload_example_fixed.dct
-f example_data/smartload_example_table.docx
-f example_data/smartload_example_table.pptx
-f example_data/smartload_example_web_tables.html
-f example_data/smartload_example_image_table.html
-
-
-
-
-
-
-
+f example_data/smartload_example.sav
+f example_data/smartload_example.xlsx
+f example_data/smartload_example.parquet
+f example_data/smartload_example.dbf
+f example_data/smartload_example.pdf
+f example_data/smartload_example.html
+f example_data/smartload_example.docx
+f example_data/smartload_example.pptx
+f example_data/smartload_example_map.dbf
+f example_data/smartload_example_map.shp

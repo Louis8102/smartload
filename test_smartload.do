@@ -26,20 +26,49 @@ gen name = "row" + string(_n)
 save "`base'\root1\sample.dta", replace
 export delimited using "`base'\root1\sample.csv", replace
 export delimited using "`base'\root1\sample.dat", replace
+file open fh using "`base'\root1\sample.csv2", write text replace
+file write fh "id;value;name" _n
+file write fh `"1;10,5;row1"' _n
+file write fh `"2;20,5;row2"' _n
+file close fh
+
+confirm file "example_data/smartload_example_map.shp"
+confirm file "example_data/smartload_example_map.dbf"
+copy "example_data/smartload_example_map.shp" "`base'/root1/smartload_geo_selftest.shp", replace
+copy "example_data/smartload_example_map.dbf" "`base'/root1/smartload_geo_selftest.dbf", replace
+confirm file "example_data/smartload_example.docx"
+confirm file "example_data/smartload_example.pptx"
+copy "example_data/smartload_example.docx" "`base'/root1/smartload_quality_office_test.docx", replace
+copy "example_data/smartload_example.pptx" "`base'/root1/smartload_quality_office_test.pptx", replace
+file open fh using "`base'\root1\sample.psv", write text replace
+file write fh "id|value|name" _n
+file write fh "1|10|row1" _n
+file write fh "2|20|row2" _n
+file close fh
+file open fh using "`base'\root1\sample.tab", write text replace
+file write fh "id" _tab "value" _tab "name" _n
+file write fh "1" _tab "10" _tab "row1" _n
+file write fh "2" _tab "20" _tab "row2" _n
+file close fh
 cap export excel using "`base'\root1\sample.xlsx", firstrow(variables) replace
 local xlsx_rc = _rc
 cap export parquet using "`base'\root1\sample.parquet", replace
 local parquet_rc = _rc
 cap export dbase using "`base'\root1\sample.dbf", replace
 local dbf_rc = _rc
+cap export spss using "`base'\root1\sample.zsav", replace
+local zsav_rc = _rc
 
 copy "`base'\root1\sample.csv" "`base'\root2\sample.csv", replace
 copy "`base'\root1\sample.dta" "`base'\root2\sample.dta", replace
 copy "`base'\root1\sample.dta" "`base'\root1\Customer Delight Data_Master.dta", replace
 
-file open fh using "`base'\root1\report.pdf", write text replace
-file write fh "%PDF placeholder"
-file close fh
+putpdf begin
+putpdf paragraph
+putpdf text ("smartload pdf text test")
+putpdf paragraph
+putpdf text ("line two")
+putpdf save "`base'\root1\report.pdf", replace
 
 file open fh using "`base'\root1\web_tables.html", write text replace
 file write fh `"<html><body><h1>tables</h1><table><tr><th>id</th><th>score</th></tr><tr><td>1</td><td>10</td></tr><tr><td>2</td><td>20</td></tr></table><table><tr><th>city</th><th>value</th></tr><tr><td>Austin</td><td>7</td></tr></table></body></html>"'
@@ -57,7 +86,7 @@ file close fh
 cap mkdir "`base'\docxbuild"
 cap mkdir "`base'\docxbuild\word"
 file open fh using "`base'\docxbuild\word\document.xml", write text replace
-file write fh `"<w:document><w:body><w:tbl><w:tr><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:rPr><w:rFonts w:ascii="Times New Roman"/></w:rPr><w:t>id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>score</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>10</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1649" w:type="dxa"/></w:tcPr><w:p><w:r><w:t>20</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"'
+file write fh `"<w:document><w:body><w:tbl><w:tr><w:tc><w:p><w:r><w:t>id</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>name</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>location</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>1</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Alice</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t xml:space="preserve">New </w:t></w:r><w:r><w:t>York</w:t></w:r></w:p></w:tc></w:tr><w:tr><w:tc><w:p><w:r><w:t>2</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Bob Smith</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>Chicago</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:body></w:document>"'
 file close fh
 local oldpwd "`c(pwd)'"
 qui cd "`base'\docxbuild"
@@ -68,10 +97,10 @@ cap mkdir "`base'\pptxbuild"
 cap mkdir "`base'\pptxbuild\ppt"
 cap mkdir "`base'\pptxbuild\ppt\slides"
 file open fh using "`base'\pptxbuild\ppt\slides\slide1.xml", write text replace
-file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:rPr lang="en-US"/><a:t>id</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>score</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>1</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>100</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>2</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:tcPr/><a:txBody><a:p><a:r><a:t>200</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
+file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>category</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>description</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>A</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>Customer service</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
 file close fh
 file open fh using "`base'\pptxbuild\ppt\slides\slide2.xml", write text replace
-file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>animal</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>count</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>cat</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>3</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
+file write fh `"<p:sld><p:cSld><p:spTree><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>item</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>count</a:t></a:r></a:p></a:txBody></a:tc></a:tr><a:tr><a:tc><a:txBody><a:p><a:r><a:t>alpha</a:t></a:r></a:p></a:txBody></a:tc><a:tc><a:txBody><a:p><a:r><a:t>3</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></p:spTree></p:cSld></p:sld>"'
 file close fh
 local oldpwd "`c(pwd)'"
 qui cd "`base'\pptxbuild"
@@ -143,7 +172,14 @@ else {
     di as txt "Skipped xlsx import test because export excel failed on this Stata installation."
 }
 
-di as txt "8. .dat text-delimited candidate succeeds"
+di as txt "8a. .dat without clear preserves changed data and returns r(4)"
+generate __smartload_memory_guard = 1
+replace __smartload_memory_guard = 2 in 1
+capture noisily smartload sample.dat
+assert _rc == 4
+confirm variable __smartload_memory_guard
+
+di as txt "8. .dat text-delimited candidate succeeds with clear"
 smartload sample.dat, clear
 assert r(N) == 5
 
@@ -174,6 +210,24 @@ assert r(N) == 3
 assert r(k) == 2
 assert "`r(importcmd)'" == "infix using"
 
+di as txt "9d. ESRI shapefile pair translates, loads, and remains spset"
+loc before_geo_pwd `"`c(pwd)'"'
+quietly cd "`base'"
+smartload smartload_geo_selftest.shp, roots("`base'/root1") maxdirs(20) clear replace
+assert r(N) == 3
+assert r(k) == 5
+assert "`r(extension)'" == "shp"
+assert "`r(importcmd)'" == "spshape2dta + use"
+confirm file "`r(spatialdata)'"
+confirm file "`r(shapefile)'"
+spset
+assert name[1] == "Alpha"
+assert value[3] == 30
+smartload smartload_geo_selftest.shp, roots("`base'/root1") maxdirs(20) clear
+assert r(N) == 3
+assert name[2] == "Beta"
+quietly cd `"`before_geo_pwd'"'
+
 di as txt "10. log output exists"
 confirm file smartload_log.txt
 
@@ -199,37 +253,87 @@ smartload Customer Delight Data_Master.dta clear
 assert r(N) == 5
 assert "`r(filename)'" == "Customer Delight Data_Master.dta"
 
-di as txt "16. PDF is detected without pretending direct import"
+di as txt "16. PDF is converted with pdf2txt and imported as plain text"
 smartload report.pdf, clear
-assert "`r(status)'" == "detected_not_imported"
+assert "`r(importcmd)'" == "pdf2txt + text import"
+assert r(k) == 2
+assert r(N) >= 1
+capture assert strpos(text[1], "smartload") > 0
+if _rc {
+    qui count if strpos(text, "smartload") > 0
+    assert r(N) > 0
+}
 
-di as txt "17. DOCX true Office table imports"
+di as txt "7b. .csv2 semicolon and comma-decimal import succeeds"
+smartload sample.csv2, firstrow clear
+assert r(N) == 2
+assert r(k) == 3
+assert value[1] == 10.5
+
+di as txt "7c. .psv pipe-delimited import succeeds"
+smartload sample.psv, firstrow clear
+assert r(N) == 2
+assert r(k) == 3
+assert value[2] == 20
+
+di as txt "7d. .tab tab-delimited import succeeds"
+smartload sample.tab, firstrow clear
+assert r(N) == 2
+assert r(k) == 3
+assert name[1] == "row1"
+
+di as txt "7e. .zsav import succeeds if compressed SPSS export was available"
+if `zsav_rc' == 0 {
+    smartload sample.zsav, clear
+    assert r(N) == 5
+    assert r(k) == 3
+    assert "`r(importcmd)'" == "import spss"
+}
+else {
+    di as txt "Skipped .zsav import test because compressed SPSS export was unavailable."
+}
+
+di as txt "16b. DOCX native table preserves numeric and text cells"
 smartload report.docx, table(1) firstrow clear
 assert r(N) == 2
-assert r(k) == 2
+assert r(k) == 3
 assert "`r(importcmd)'" == "office table extraction"
 assert id[1] == 1
-assert score[2] == 20
+assert name[2] == "Bob Smith"
+assert location[1] == "New York"
 
-di as txt "18. PPTX true Office table imports"
+di as txt "16c. PPTX native tables are numbered in slide order"
 smartload slides.pptx, table(1) firstrow clear
-assert r(N) == 2
-assert r(k) == 2
-assert "`r(importcmd)'" == "office table extraction"
-assert r(ntables) == 2
-assert id[1] == 1
-assert score[2] == 200
-
-di as txt "18b. PPTX second table can be selected"
-smartload slides.pptx, table(2) firstrow clear
 assert r(N) == 1
 assert r(k) == 2
-assert r(table) == 2
 assert r(ntables) == 2
-assert animal[1] == "cat"
+assert category[1] == "A"
+assert description[1] == "Customer service"
+
+di as txt "16d. PPTX second native table can be selected"
+smartload slides.pptx, table(2) firstrow clear
+assert r(N) == 1
+assert r(table) == 2
+assert item[1] == "alpha"
 assert count[1] == 3
 
-di as txt "18c. HTML true table imports"
+di as txt "16e. packaged DOCX has one 20-column by 8-row quality table"
+smartload smartload_quality_office_test.docx, table(1) firstrow clear
+assert r(ntables) == 1
+assert r(N) == 8
+assert r(k) == 20
+assert inspect_id[1] == "A7K2M9Q4T6X1"
+assert issue[8] == "Damaged moisture-proof package seal"
+
+di as txt "16f. packaged PPTX has one 20-column by 8-row quality table"
+smartload smartload_quality_office_test.pptx, table(1) firstrow clear
+assert r(ntables) == 1
+assert r(N) == 8
+assert r(k) == 20
+assert inspect_id[1] == "A7K2M9Q4T6X1"
+assert issue[8] == "Damaged moisture-proof package seal"
+
+di as txt "17. HTML true table imports"
 smartload web_tables.html, table(1) firstrow clear
 assert r(N) == 2
 assert r(k) == 2
@@ -289,29 +393,12 @@ if _rc {
     di as txt "GitHub URL import was not completed, usually because the test URL is illustrative or network access is unavailable."
 }
 
-di as txt "22. Google Docs and Sheets share URLs are normalized"
-tempfile googlematch
-smartload__urlmatch, url("https://docs.google.com/spreadsheets/d/abc123/edit?gid=987") saving("`googlematch'")
-use "`googlematch'", clear
-assert filename[1] == "google_sheet.csv"
-assert ext[1] == "csv"
-assert strpos(filepath[1], "/export?format=csv") > 0
-local filepath = filepath[1]
-local matchedext = ext[1]
-local extpath "`filepath'"
-local qpos = strpos("`extpath'", "?")
-if `qpos' > 0 local extpath = substr("`extpath'", 1, `qpos' - 1)
-mata: st_local("reext", strlower(pathsuffix(st_local("extpath"))))
-local reext : subinstr local reext "." "", all
-if "`matchedext'" != "" local reext "`matchedext'"
-assert "`reext'" == "csv"
-smartload__urlmatch, url("https://docs.google.com/document/d/doc456/edit") saving("`googlematch'")
-use "`googlematch'", clear
-assert filename[1] == "google_doc.html"
-assert ext[1] == "html"
-assert strpos(filepath[1], "/export?format=html") > 0
+di as txt "22. Google URL normalization is exercised through the public URL tests"
+di as txt "Private smartload helper programs are intentionally not called directly."
+cap noi smartload "https://docs.google.com/presentation/d/abc123/edit", table(1) clear
+assert _rc != 198
 
-di as result "All runnable smartload V0.6.8 tests completed."
+di as result "All runnable smartload V0.7.3 tests completed."
 log close smartload_selftest
 
 

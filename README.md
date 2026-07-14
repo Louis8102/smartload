@@ -1,36 +1,14 @@
-# smartload V0.6.8 Notes
+# smartload V0.7.3
 
-`smartload` is an SSC-style Stata command by Hao Ma. It loads a local data file by file name, without requiring the user to remember the folder path.
+`smartload` is an SSC-style Stata command. Its defining feature is path-free data loading: the user supplies a file name, and `smartload` finds and imports the file without requiring a drive letter, folder path, or cloud-sync location.
 
-The basic idea is simple:
+It searches local disks and locally available cloud-sync folders. For OneDrive, Google Drive for desktop, Dropbox, Box Drive, or SharePoint Sync, the provider's desktop client must be installed and signed in, and the files must appear in Windows File Explorer or as an ordinary operating-system path. Browser login alone is not sufficient. Files already available offline can be searched and loaded like ordinary disk files. Online-only placeholders may require the cloud client to download the content before Stata can read it, so their import time depends on the provider and network connection.
 
-```stata
-smartload Indicator.dta, clear
-smartload survey.sav, clear
-smartload city.sas7bdat, clear
-smartload workbook.xlsx, firstrow clear
-smartload panel.parquet, clear
-smartload table.dbf, clear
-smartload fixed_dictionary.dct, clear
-smartload report.docx, table(1) firstrow clear
-smartload slides.pptx, table(1) firstrow clear
-smartload web_tables.html, table(1) firstrow clear
-smartload "https://example.com/page.html", table(1) firstrow clear
-smartload "https://designsystem.digital.gov/components/table/", table(5) firstrow clear
-smartload "https://www.w3schools.com/html/tryit.asp?filename=tryhtml_table_th_vertical", table(1) clear
-smartload "https://www.stata-press.com/data/r18/auto.dta", clear
-smartload "https://raw.githubusercontent.com/user/repo/main/data.csv", clear
-smartload "https://docs.google.com/spreadsheets/d/FILEID/edit#gid=0", clear
-smartload "https://docs.google.com/document/d/FILEID/edit", table(1) firstrow clear
-```
+Its second defining feature is direct web-data loading. A public URL can point to a Stata-readable data file, a public Google Sheet, a GitHub data file, or a web page containing true HTML tables. `smartload` normalizes supported links and imports the data without requiring the user to download and locate a local copy first. Login-protected pages, JavaScript-rendered grids, screenshots, and image tables require a different access or extraction method and are not presented as direct HTML-table imports.
 
-The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.  V0.6.8 also tolerates common omitted-comma cases such as `smartload filename.ext clear` and treats the final `clear` as an option, not as part of the file name.
-
-For local file names, `smartload` first tries Everything through `es.exe` on Windows, then tries its saved Stata index, then runs a bounded fast search over common locations. It does not default to a deep full-drive scan. For `http://` or `https://` URLs, `smartload` skips local search and imports directly from the URL. Direct data-file URLs are imported with Stata's native commands. Web pages are scanned for true HTML `<table>` elements.
+`smartload` is a targeted data loader, not a web crawler. It processes the file name or URL supplied by the user; it does not traverse links, crawl websites, or bulk-harvest pages.
 
 ## Installation
-
-V0.6.8 is SSC-style, but it is not official SSC unless submitted to and accepted by SSC.
 
 Install from GitHub:
 
@@ -39,23 +17,58 @@ net install smartload, from("https://raw.githubusercontent.com/Louis8102/smartlo
 help smartload
 ```
 
-No SSC dependency is required.
-
-## Optional Everything Accelerator
-
-On Windows, `smartload` can use Everything for near-instant file-name search, but Stata needs the Everything command-line interface `es.exe`.
-
-If Everything is already installed, run this once in Stata:
+To copy the optional example datasets into Stata's current working directory:
 
 ```stata
-smartload, installes
+net get smartload, from("https://raw.githubusercontent.com/Louis8102/smartload/main") replace
 ```
 
-This downloads the official 64-bit `ES-1.1.0.30.x64.zip` from voidtools, unzips `es.exe`, and stores it in the user's PERSONAL ado folder under `smartload_bin`. No administrator permission is needed for this ES placement. This ES download is separate from web-page importing.
+Stata treats datasets and demonstration documents as ancillary files: `net install` installs the command and help, while `net get` copies the examples. A ZIP download of the repository keeps them grouped under `example_data`.
 
-Important: `es.exe` is not Everything itself. Everything must already be installed and running. If Everything is not installed/running, or if the computer blocks downloads from Stata, `smartload` falls back to its saved Stata index and bounded fast search.
+This folder is the speed-first build. The search accelerator and fallback behavior are described below.
 
-## Recommended First Setup
+## Basic Usage
+
+```stata
+smartload Indicator.dta, clear
+smartload survey.sav, clear
+smartload compressed_survey.zsav, clear
+smartload european.csv2, firstrow clear
+smartload extract.psv, firstrow clear
+smartload city.sas7bdat, clear
+smartload workbook.xlsx, firstrow clear
+smartload panel.parquet, clear
+smartload table.dbf, clear
+smartload counties.shp, clear
+smartload fixed_dictionary.dct, clear
+smartload report.pdf, clear
+smartload report.docx, table(1) firstrow clear
+smartload slides.pptx, table(1) firstrow clear
+smartload web_tables.html, table(1) firstrow clear
+smartload "https://www.stata-press.com/data/r18/auto.dta", clear
+smartload "https://docs.google.com/spreadsheets/d/FILEID/edit#gid=0", firstrow clear
+smartload "https://docs.google.com/document/d/FILEID/edit", table(1) firstrow clear
+smartload "https://docs.google.com/presentation/d/FILEID/edit", table(1) firstrow clear
+```
+
+The standard Stata syntax uses a comma before options: `smartload filename.ext, clear`.
+
+`smartload` never silently discards a dataset already in memory. If Stata reports that data in memory would be lost, rerun the selected file with `, clear` after saving anything you need.
+
+## Search Behavior
+
+For local file names, V0.7.3 uses this order:
+
+1. Use Everything through `es.exe` on Windows, when available.
+2. Search the saved `smartload_index.dta`, if it exists.
+3. Run a bounded fast search over common local folders.
+4. Ask the user to run `smartload, setup` or refresh selected folders if no match is found.
+
+On Windows, Everything plus `es.exe` is the route that provides near-instant file-name lookup on indexed local volumes. `smartload, installes` installs only the small Everything command-line client; the Everything application and its index must also be installed and running. When that route is available, users normally do not need to build a separate `smartload` full-drive index.
+
+Without Everything, `smartload` remains usable through its saved Stata index and bounded folder search, but the initial index build can take minutes on large drives and a broad fallback search cannot promise one-second results. The saved index persists across Stata restarts and computer shutdowns; rebuild it only after relevant files have been added, moved, renamed, or deleted.
+
+On organization-managed computers, administrator policy may prohibit installing Everything, running its service, or viewing restricted folders. `smartload` does not bypass operating-system permissions. In that situation, use an index over approved data folders or ask the organization's IT administrator whether Everything is permitted.
 
 For a guided setup:
 
@@ -63,172 +76,75 @@ For a guided setup:
 smartload, setup
 ```
 
-The setup menu offers:
-
-```text
-1. Index common user folders only
-2. Index current project folder
-3. Index selected folders
-4. Deep full-drive index (slow)
-```
-
-For workplace computers, the recommended approach is to index business data folders, not the entire machine:
+For selected folders:
 
 ```stata
 smartload, refresh roots("F:\Project;G:\Data;H:\Shared")
 ```
 
-After that, daily use is just:
-
-```stata
-smartload Indicator.dta, clear
-```
-
-The index is stored as `smartload_index.dta` in the user's PERSONAL ado directory. It survives Stata restarts and computer shutdowns. Rebuild it after files are added, moved, renamed, or deleted.
-
-## Search Behavior
-
-When you run:
-
-```stata
-smartload filename.ext, clear
-```
-
-V0.6.8 uses this order for local file names:
-
-1. On Windows, use Everything's command-line interface `es.exe` if available.
-2. Search `smartload_index.dta`, if it exists.
-3. If no indexed match is found, run a bounded fast search over common locations.
-4. If no match is found, ask the user to run `smartload, setup` or refresh selected folders.
-
-Everything GUI alone is not enough for automatic Stata integration. `smartload` needs `es.exe`, the Everything Command-line Interface from voidtools. If Everything is installed but `es.exe` is missing, run:
+If Everything is installed but `es.exe` is missing, run:
 
 ```stata
 smartload, installes
 ```
 
-The fast search first checks direct matches in common locations, including drive roots and common drive-level data folders such as `D:\data`, `D:\Data`, `D:\datasets`, and `D:\Project`, before spending time on recursive folder traversal.
+`es.exe` is the Everything command-line interface. Everything itself must already be installed and running.
 
-V0.6.8 does not claim pure Stata instant full-computer search. Deep full-drive indexing can take many minutes on large computers and should be explicit:
+## Supported Imports
 
-```stata
-smartload, refresh drives(all)
-smartload, refresh drives(C F)
-```
-
-Future versions may add additional optional accelerators such as Spotlight on macOS or locate/plocate on Linux when a stable command-line interface is available.
-
-## Localized Cloud Drives
-
-`smartload` supports cloud-drive files when they are locally synced or mounted as ordinary folders/drives. Examples include OneDrive, Dropbox, Google Drive for desktop, Box Drive, and SharePoint Sync when the files appear under a local path such as:
-
-```text
-C:\Users\YourName\OneDrive\...
-G:\My Drive\...
-C:\Users\YourName\Dropbox\...
-```
-
-For best speed, mark important cloud data folders as "Always keep on this device" or the equivalent setting in the cloud client, and let Everything index those local cloud folders. If a file is online-only, `smartload` may find the placeholder path but Stata import can still pause while the cloud client downloads the file.
-
-If Everything finds a same-named file on a normal drive, V0.6.8 still performs a bounded check of common local cloud roots such as `C:\Users\...\Box`, `OneDrive`, `Dropbox`, `Google Drive`, and `SharePoint`. This prevents a local Box/OneDrive copy from being silently missed just because Everything returned another copy first.
-
-Authenticated cloud accounts are not the same thing as local indexing. Even after a user signs in to Google Drive, OneDrive, Dropbox, Box, or SharePoint in a browser, `smartload` cannot promise instant cloud-wide search unless those files are exposed locally or a provider-specific API workflow is added. Pure browser-only cloud files without a local path are outside the instant local-search guarantee.
-
-Without Everything, users can index selected local cloud roots:
-
-```stata
-smartload, refresh roots("C:\Users\YourName\OneDrive;G:\My Drive;C:\Users\YourName\Dropbox")
-```
-
-## URL and GitHub Imports
-
-When the input starts with `http://` or `https://`, `smartload` treats it as a URL and does not search the local computer:
-
-```stata
-smartload "https://www.stata-press.com/data/r18/auto.dta", clear
-smartload "https://raw.githubusercontent.com/user/repo/main/data.csv", clear
-```
-
-Common GitHub `blob` URLs are converted to raw URLs automatically:
-
-```stata
-smartload "https://github.com/user/repo/blob/main/data.csv", clear
-```
-
-URL support covers direct data-file URLs and true HTML tables in web pages. For direct data files, the URL should point to a supported extension such as `.dta`, `.csv`, `.xlsx`, `.sav`, `.sas7bdat`, `.parquet`, or `.dbf`. For web pages, `smartload` parses real HTML `<table>` elements and also tries table markup that appears in escaped HTML code blocks, such as `&lt;table&gt;...&lt;/table&gt;`. Web-page URLs ending in `.html`, `.htm`, `.asp`, `.aspx`, `.php`, `.jsp`, `.cfm`, or `.cgi`, URLs without a visible extension, and URLs ending in a slash are treated as web pages. If exactly one table is found, it is imported directly. If several tables are found, interactive Stata users are asked to choose a numbered table; in batch mode use `table(#)`.
-
-Public Google links are handled separately from local synced Google Drive folders. A public Google Sheets share URL is converted to a CSV export URL and imported with `import delimited`; use `firstrow` when the first row contains variable names. A public Google Docs share URL is converted to an HTML export URL, and then `smartload` extracts true HTML tables from that exported document. Private links that require Google login are not imported by the SSC-style default path; share the document publicly, publish it, download/export it locally, or use a future API/OAuth-enhanced workflow.
-
-Web pages that only look tabular because of CSS grid/div layouts, JavaScript rendering, screenshots, or images are not imported automatically. If image elements are detected but no true `<table>` exists, `smartload` explains that OCR is required. OCR is deliberately not run by default because it is slower, less reliable, and usually requires external tools.
-
-For SSC-style portability, web-page URL downloads use Stata's native downloader and do not automatically call PowerShell, curl, or other shell tools. Some servers allow browser viewing but block Stata downloads, require browser JavaScript, or require authentication. If that happens, save the page as a local `.html` file and run `smartload` on the saved file.
-
-For `.dct`, use local files because the dictionary usually references a companion raw data file.
-
-## Duplicate File Names
-
-If the same file name is found in multiple locations, `smartload` lists all matches:
-
-```text
-Found multiple files named Indicator.dta:
-1. C:/Users/YourName/Downloads/Indicator.dta
-2. F:/Project/Data/Indicator.dta
-3. G:/Backup/Indicator.dta
-```
-
-In interactive Stata, type the Arabic numeral for the file to import. In batch mode, use `choice(#)`:
-
-```stata
-smartload Indicator.dta, choice(2) clear
-```
-
-## Supported Native Imports
-
-V0.6.8 imports Stata-readable data files through Stata's native commands:
+V0.7.3 imports Stata-readable data files and native document tables through Stata:
 
 - `.dta` via `use`
 - `.xlsx` and `.xls` via `import excel`
-- `.csv`, `.txt`, `.tsv`, and text-like `.dat` via `import delimited`
-- `.sav` and `.por` via `import spss`
+- `.csv`, `.txt`, and text-like `.dat` via `import delimited`
+- `.csv2` as semicolon-delimited text with comma decimals
+- `.psv` as pipe-delimited text; `.tsv` and `.tab` as tab-delimited text
+- `.sav`, compressed `.zsav`, and `.por` via `import spss`
 - `.sas7bdat` via `import sas`
 - `.xpt` via `import sasxport5`
 - `.v8xpt` via `import sasxport8`
 - `.parquet` via `import parquet`
 - `.dbf` via `import dbase`
+- local ESRI `.shp` plus its matching `.dbf` via `spshape2dta`
 - `.dct` fixed-format dictionaries via `infix using`
-- `.docx` true Word tables via experimental Office table extraction
-- `.pptx` true PowerPoint tables via experimental Office table extraction
-- `.html`, `.htm`, `.asp`, `.aspx`, `.php`, `.jsp`, `.cfm`, and `.cgi` true HTML tables via experimental HTML table extraction
+- `.pdf` via StataNow `pdf2txt`, imported as plain text lines
+- `.docx` native Word tables through Office Open XML table extraction
+- `.pptx` native PowerPoint tables through Office Open XML table extraction
+- `.html`, `.htm`, `.asp`, `.aspx`, `.php`, `.jsp`, `.cfm`, and `.cgi` true HTML tables
 
-The same extension-based dispatch is used for direct URLs when Stata's native command can read that URL. URLs with common web-page extensions such as `.html`, `.htm`, `.asp`, `.aspx`, `.php`, `.jsp`, `.cfm`, or `.cgi`, URLs without a visible file extension, or URLs ending in a slash are treated as web pages and scanned for true HTML tables.
+PDF support is plain-text support. It does not perform OCR and does not reconstruct PDF tables.
 
-For `.docx` and `.pptx`, `smartload` extracts real Office table XML only. It does not OCR screenshots, pictures, scanned tables, legacy `.doc`/`.ppt`, merged-cell layouts, or arbitrary page text. If exactly one true table is found, it is imported directly. If several true tables are found, interactive Stata users are asked to choose a numbered table. Use `table(#)` to select a table directly, and use `firstrow` when the first table row contains variable names.
+DOCX and PPTX support reads native Office table objects, including numeric cells, text cells, dates stored as text, and mixed textual content. It does not require every cell to be numeric. If one native table is present, it is selected automatically. If several tables are present, `smartload` lists numbered previews and asks which table to import; `table(#)` selects one directly. Use `firstrow` when the first table row contains variable names.
 
-For HTML/web-page inputs, `smartload` extracts real HTML `<table>` elements only. It does not execute JavaScript, infer visual CSS tables, or OCR image tables. Use `table(#)` to select a table and `firstrow` when the first row contains variable names.
+Pictures, screenshots, scanned tables, charts, and ordinary document text are not treated as native tables. Legacy binary `.doc` and `.ppt` files must first be saved as `.docx` or `.pptx`; merely renaming the extension does not convert the file.
 
-The Stata menu also includes JDBC, ODBC, FRED, and Haver entries. These are connection/data-source workflows rather than ordinary files found by file name on disk, so they are outside the `smartload filename.ext` workflow.
+For an ESRI shapefile, keep `map.shp` and `map.dbf` together. `smartload map.shp, clear` creates persistent `map_smartload.dta` and `map_smartload_shp.dta` files in Stata's current working directory and loads the first one as an `spset` dataset. If that name belongs to another source path, a numeric suffix is added automatically. Existing translated files from the same source are reused for speed. Use `smartload map.shp, clear replace` after the source shapefile changes. Other companion files such as `.shx` and `.prj` may remain in the source folder, but Stata's native translator requires the `.shp` and `.dbf` pair.
 
-For `.sav`/`.por`, `smartload` uses Stata's native `import spss` so variable labels and value labels are preserved whenever Stata can preserve them.
+## URLs and Cloud Folders
+
+Direct `http://` and `https://` data-file URLs are imported with Stata's native commands when possible. Common GitHub `blob` URLs are converted to raw URLs automatically.
+
+For HTML pages, `smartload` first uses Stata's native downloader and then tries the system `curl` command when available. PowerShell is not used. This improves compatibility with public websites that reject Stata's downloader, but it cannot bypass authentication, anti-bot controls, JavaScript-only rendering, or network policy.
+
+Public Google Sheets share URLs are converted to CSV export URLs. Public Google Docs share URLs are converted to HTML export URLs and scanned for true HTML tables. Public Google Slides links are converted to PPTX export URLs and scanned for native PowerPoint table objects.
+
+The Google file must be publicly accessible to the link. `smartload` does not request, store, or bypass Google account credentials. Creating or modifying files inside a user's Google account would require a separate OAuth-authorized Drive integration and is outside this loader's scope.
+
+Local synced cloud-drive folders, such as OneDrive, Google Drive for desktop, Dropbox, Box Drive, and SharePoint Sync, are treated as ordinary local folders. Browser-only cloud files are not searched unless they are exposed through a local path or public URL.
 
 ## Detected But Not Imported
 
-These files are indexed/detected but not automatically imported in V0.6.8:
+These files are detected but not automatically imported in this build:
 
 - R files: `.rds`, `.rda`, `.RData`, `.r`
-- Document containers not supported as rectangular data: `.doc`, `.ppt`, `.pdf`
-- Web/image tables without true HTML `<table>` structure
+- Legacy binary Office containers: `.doc`, `.ppt`
+- Image-only PDFs or scanned tables requiring OCR
 - Python/data-science containers other than native Parquet: `.feather`, `.pkl`, `.pickle`, `.arrow`, `.h5`, `.hdf5`, `.json`, `.jsonl`
-- GIS, database, and archive files
+- GIS containers other than Stata's native ESRI shapefile workflow, database containers, and archives
 
-R files are not imported automatically because Stata has no native `.rds`/`.RData` importer, and R files may contain non-rectangular objects or multiple objects. Convert in R to `.dta`, `.parquet`, or `.csv`, then run `smartload` again.
+Convert these files to `.dta`, `.csv`, `.xlsx`, or `.parquet` before using `smartload`.
 
-DOC/PPT/PDF files may contain visual tables, but they are document containers. V0.6.8 does not claim accurate table extraction for those formats. DOCX/PPTX support is limited to true Office table objects.
-
-Web pages may contain true HTML tables, escaped table code examples, CSS/JavaScript visual tables, or image tables. V0.6.8 imports true HTML tables and tries escaped table code examples. Image tables require OCR and CSS/JavaScript visual tables require a different extraction strategy, so they are detected/explained rather than silently imported.
-
-## Files
-
-Recommended GitHub layout:
+## Package Files
 
 ```text
 smartload/
@@ -239,23 +155,30 @@ smartload/
   smartload.pkg
   stata.toc
   test_smartload.do
-  example_data/
 ```
 
-`stata.toc` is the Stata package-directory index used by `net install`. `smartload.pkg` is the install manifest.
+The repository includes an `example_data` directory so a reader can download it and try `smartload` immediately. `net get smartload` copies the same ancillary files into Stata's current working directory. The non-geospatial files all contain the same ASCII-only product-quality dataset: 8 observations and 20 variables. The examples cover DTA, CSV, CSV2, DAT, TXT, TSV, Excel, SPSS, SAS, Parquet, DBF, PDF, HTML, DOCX, and PPTX. The Word and PowerPoint files each contain one native editable table with black cell borders; they are not screenshots. The ESRI shapefile example is necessarily a separate spatial dataset and includes a same-name `.shp` and `.dbf` pair.
+
+```stata
+smartload smartload_example.dta, clear
+smartload smartload_example.csv, firstrow clear
+smartload smartload_example.csv2, firstrow clear
+smartload smartload_example.xlsx, firstrow clear
+smartload smartload_example.parquet, clear
+smartload smartload_example.dbf, clear
+smartload smartload_example.pdf, clear
+smartload smartload_example_map.shp, clear
+smartload smartload_example.html, table(1) firstrow clear
+smartload smartload_example.docx, table(1) firstrow clear
+smartload smartload_example.pptx, table(1) firstrow clear
+```
+
+The self-test creates temporary fixtures and copies the packaged shapefile pair into its temporary workspace before testing. Public URL examples remain network-dependent and are not treated as mandatory offline tests.
 
 ## Version
 
-- Version: 0.6.8
-- Date: 2026-07-11
+- Version: 0.7.3
+- Date: 2026-07-14
 - Author: Hao Ma
 - License: MIT
 - Tested target: StataNow/MP 19.5
-
-
-
-
-
-
-
-
